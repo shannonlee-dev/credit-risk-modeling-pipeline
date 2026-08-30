@@ -34,6 +34,17 @@ flowchart LR
 
 Python 3.10 이상이 필요합니다.
 
+`uv`를 사용하는 경우:
+
+```bash
+uv sync
+uv run python data_gen.py
+uv run python train.py
+uv run python -m pytest -v
+```
+
+`pip`을 사용하는 경우:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -47,6 +58,8 @@ python train.py
 ```bash
 python -m pytest -v
 ```
+
+`requirements.txt`와 `pyproject.toml`에는 프로젝트가 직접 사용하는 라이브러리만 명시합니다. 재현 가능한 전이 의존성 버전은 `uv.lock`에서 관리합니다.
 
 `finance_data.csv`와 예측 CSV는 `.gitignore`의 `*.csv` 규칙으로 저장소에서 제외됩니다. 전체 실행 결과는 `artifacts/`에 생성됩니다.
 
