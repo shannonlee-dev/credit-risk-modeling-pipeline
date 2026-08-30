@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- `docs/private/mission.md`와 `docs/private/rublic.md`의 필수 항목만 구현하고 보너스 항목은 구현하지 않는다.
+- `docs/private/mission.md`와 `docs/private/rubric.md`의 필수 항목만 구현하고 보너스 항목은 구현하지 않는다.
 - 데이터 생성은 제공된 `N_SAMPLES=10000`, `RANDOM_STATE=42`와 수식을 유지한다.
 - 모델 입력은 `age`, `annual_income`, `spending_score`, `debt_ratio`, `credit_card_count`, `overdue_count_6m`만 사용한다.
 - 분류 분할은 `test_size=0.2`, `stratify=y`, `random_state=42`를 사용하고 모든 CV는 Train Set 내부 5-fold로 수행한다.

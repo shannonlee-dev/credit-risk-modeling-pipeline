@@ -1,0 +1,281 @@
+{
+  "data_distribution": {
+    "all": {
+      "count_0": 8799,
+      "count_1": 1201,
+      "positive_rate": 0.1201
+    },
+    "train": {
+      "count_0": 7039,
+      "count_1": 961,
+      "positive_rate": 0.120125
+    },
+    "test": {
+      "count_0": 1760,
+      "count_1": 240,
+      "positive_rate": 0.12
+    }
+  },
+  "classification": {
+    "metrics": {
+      "Rule Baseline": {
+        "accuracy": 0.7725,
+        "precision": 0.32854864433811803,
+        "recall": 0.8583333333333333,
+        "f1": 0.47520184544405997,
+        "roc_auc": 0.809564393939394,
+        "prediction_latency_ms": 14.505778599414043
+      },
+      "Logistic Regression": {
+        "accuracy": 0.8775,
+        "precision": 0.4940898345153664,
+        "recall": 0.8708333333333333,
+        "f1": 0.6304675716440422,
+        "roc_auc": 0.95046875,
+        "prediction_latency_ms": 3.3536160000949167
+      },
+      "Random Forest": {
+        "accuracy": 0.908,
+        "precision": 0.6573033707865169,
+        "recall": 0.4875,
+        "f1": 0.5598086124401914,
+        "roc_auc": 0.9355930397727272,
+        "prediction_latency_ms": 40.97942700027488
+      },
+      "Random Forest (Tuned)": {
+        "accuracy": 0.8835,
+        "precision": 0.5091383812010444,
+        "recall": 0.8125,
+        "f1": 0.6260032102728732,
+        "roc_auc": 0.9380894886363637,
+        "prediction_latency_ms": 37.818482399598
+      }
+    },
+    "logistic_cv": {
+      "f1_mean": 0.6435186122570105,
+      "roc_auc_mean": 0.9536754048940292
+    },
+    "best_params": {
+      "model__max_depth": 8,
+      "model__min_samples_split": 5,
+      "model__n_estimators": 100
+    },
+    "best_cv_f1": 0.6498937322296546,
+    "feature_importance": {
+      "annual_income": 0.518697118357436,
+      "overdue_count_6m": 0.2276753670503602,
+      "debt_ratio": 0.15861666156380275,
+      "spending_score": 0.039456123587690024,
+      "age": 0.03300170701385474,
+      "credit_card_count_1": 0.0028356587477347947,
+      "credit_card_count_8": 0.0028214982311382977,
+      "credit_card_count_2": 0.0028050461108972,
+      "credit_card_count_7": 0.0026101961572386205,
+      "credit_card_count_4": 0.0025390770234511753,
+      "credit_card_count_9": 0.002487155957616726,
+      "credit_card_count_6": 0.002197327210423558,
+      "credit_card_count_5": 0.002149162141777271,
+      "credit_card_count_3": 0.0021079008465784495
+    }
+  },
+  "regression": {
+    "cv_rmse": {
+      "Ridge": {
+        "0.01": 29.778658453165605,
+        "0.1": 29.77865627152131,
+        "1": 29.778636475352403,
+        "10": 29.778639845627886,
+        "100": 29.79813150341219
+      },
+      "Lasso": {
+        "0.01": 29.777302887748156,
+        "0.1": 29.771199688034176,
+        "1": 29.81794780742795,
+        "10": 34.37504595375255,
+        "100": 80.24950975160799
+      }
+    },
+    "selected_alpha": {
+      "Ridge": 1.0,
+      "Lasso": 0.1
+    },
+    "test_metrics": {
+      "Ridge": {
+        "rmse": 29.410265327880794,
+        "mae": 23.303028698900963,
+        "r2": 0.8602380865410363
+      },
+      "Lasso": {
+        "rmse": 29.368371087402675,
+        "mae": 23.2765538082251,
+        "r2": 0.8606359781503063
+      }
+    },
+    "coefficients": {
+      "Ridge": {
+        "0.01": {
+          "age": -0.12155330984896125,
+          "annual_income": 57.828487620224685,
+          "spending_score": -0.32106939673335,
+          "debt_ratio": -28.81348152713855,
+          "overdue_count_6m": -36.054227589224055,
+          "credit_card_count_1": -0.9083786598336568,
+          "credit_card_count_2": -0.880868233337913,
+          "credit_card_count_3": -0.19558697928152302,
+          "credit_card_count_4": 0.27537492024260624,
+          "credit_card_count_5": 1.431149715480613,
+          "credit_card_count_6": -0.1992905575477967,
+          "credit_card_count_7": 0.34782358492966337,
+          "credit_card_count_8": -0.2892354094652379,
+          "credit_card_count_9": 0.4190116195015664
+        },
+        "0.1": {
+          "age": -0.12156219307679275,
+          "annual_income": 57.827843950845256,
+          "spending_score": -0.3210584771110841,
+          "debt_ratio": -28.81316992586885,
+          "overdue_count_6m": -36.05382323305129,
+          "credit_card_count_1": -0.9082817079486405,
+          "credit_card_count_2": -0.8808243246373766,
+          "credit_card_count_3": -0.19560586894437304,
+          "credit_card_count_4": 0.27538691919519503,
+          "credit_card_count_5": 1.4310051280859901,
+          "credit_card_count_6": -0.19924153877357653,
+          "credit_card_count_7": 0.3477523198397793,
+          "credit_card_count_8": -0.28917613317822927,
+          "credit_card_count_9": 0.41898520644102194
+        },
+        "1": {
+          "age": -0.12165101449916446,
+          "annual_income": 57.82140804985226,
+          "spending_score": -0.32094930642316066,
+          "debt_ratio": -28.810054287544688,
+          "overdue_count_6m": -36.04978017533519,
+          "credit_card_count_1": -0.9073132962786664,
+          "credit_card_count_2": -0.8803856818765015,
+          "credit_card_count_3": -0.1957945033330863,
+          "credit_card_count_4": 0.27550673149747207,
+          "credit_card_count_5": 1.429560870955936,
+          "credit_card_count_6": -0.19875191023784627,
+          "credit_card_count_7": 0.3470404917257094,
+          "credit_card_count_8": -0.2885840562255643,
+          "credit_card_count_9": 0.4187213537801693
+        },
+        "10": {
+          "age": -0.12253813010581396,
+          "annual_income": 57.757128217152406,
+          "spending_score": -0.31986014461138906,
+          "debt_ratio": -28.77893529180511,
+          "overdue_count_6m": -36.00939993025486,
+          "credit_card_count_1": -0.8977387032200805,
+          "credit_card_count_2": -0.8760432433741637,
+          "credit_card_count_3": -0.19765499212295567,
+          "credit_card_count_4": 0.276687263576805,
+          "credit_card_count_5": 1.4152781085985577,
+          "credit_card_count_6": -0.19391101077789852,
+          "credit_card_count_7": 0.3400035199176012,
+          "credit_card_count_8": -0.2827311877466838,
+          "credit_card_count_9": 0.41611024514949346
+        },
+        "100": {
+          "age": -0.13128816033272012,
+          "annual_income": 57.12214642909804,
+          "spending_score": -0.30921517374631063,
+          "debt_ratio": -28.471435394974282,
+          "overdue_count_6m": -35.61056311552486,
+          "credit_card_count_1": -0.8118143259707763,
+          "credit_card_count_2": -0.8365677582884287,
+          "credit_card_count_3": -0.21394536187496785,
+          "credit_card_count_4": 0.2869120641301838,
+          "credit_card_count_5": 1.28680896563326,
+          "credit_card_count_6": -0.15049770635973472,
+          "credit_card_count_7": 0.2769521434787519,
+          "credit_card_count_8": -0.23031090260949236,
+          "credit_card_count_9": 0.39246288186127043
+        }
+      },
+      "Lasso": {
+        "0.01": {
+          "age": -0.10998178002853032,
+          "annual_income": 57.819337610751276,
+          "spending_score": -0.3101161534859663,
+          "debt_ratio": -28.80318562156703,
+          "overdue_count_6m": -36.044873921618205,
+          "credit_card_count_1": -0.6683281582278194,
+          "credit_card_count_2": -0.6407016703340882,
+          "credit_card_count_3": -0.0,
+          "credit_card_count_4": 0.33274578129795646,
+          "credit_card_count_5": 1.4886633143522703,
+          "credit_card_count_6": -0.0,
+          "credit_card_count_7": 0.4078832619334442,
+          "credit_card_count_8": -0.04972263728561687,
+          "credit_card_count_9": 0.4787089401432722
+        },
+        "0.1": {
+          "age": -0.014062466294706553,
+          "annual_income": 57.7370226047313,
+          "spending_score": -0.21395992862067176,
+          "debt_ratio": -28.71373925434015,
+          "overdue_count_6m": -35.957233244475155,
+          "credit_card_count_1": -0.0,
+          "credit_card_count_2": -0.0,
+          "credit_card_count_3": -0.0,
+          "credit_card_count_4": 0.0,
+          "credit_card_count_5": 0.5837086065173963,
+          "credit_card_count_6": -0.0,
+          "credit_card_count_7": 0.0,
+          "credit_card_count_8": -0.0,
+          "credit_card_count_9": 0.0
+        },
+        "1": {
+          "age": -0.0,
+          "annual_income": 56.85633120043992,
+          "spending_score": -0.0,
+          "debt_ratio": -27.826420682431273,
+          "overdue_count_6m": -35.06239390079598,
+          "credit_card_count_1": -0.0,
+          "credit_card_count_2": -0.0,
+          "credit_card_count_3": -0.0,
+          "credit_card_count_4": 0.0,
+          "credit_card_count_5": 0.0,
+          "credit_card_count_6": -0.0,
+          "credit_card_count_7": 0.0,
+          "credit_card_count_8": -0.0,
+          "credit_card_count_9": 0.0
+        },
+        "10": {
+          "age": -0.0,
+          "annual_income": 48.06175371146176,
+          "spending_score": -0.0,
+          "debt_ratio": -19.003953750132776,
+          "overdue_count_6m": -26.083982244241618,
+          "credit_card_count_1": -0.0,
+          "credit_card_count_2": -0.0,
+          "credit_card_count_3": -0.0,
+          "credit_card_count_4": 0.0,
+          "credit_card_count_5": 0.0,
+          "credit_card_count_6": 0.0,
+          "credit_card_count_7": -0.0,
+          "credit_card_count_8": 0.0,
+          "credit_card_count_9": 0.0
+        },
+        "100": {
+          "age": -0.0,
+          "annual_income": 0.0,
+          "spending_score": 0.0,
+          "debt_ratio": -0.0,
+          "overdue_count_6m": -0.0,
+          "credit_card_count_1": -0.0,
+          "credit_card_count_2": -0.0,
+          "credit_card_count_3": -0.0,
+          "credit_card_count_4": 0.0,
+          "credit_card_count_5": 0.0,
+          "credit_card_count_6": 0.0,
+          "credit_card_count_7": -0.0,
+          "credit_card_count_8": 0.0,
+          "credit_card_count_9": 0.0
+        }
+      }
+    }
+  }
+}
