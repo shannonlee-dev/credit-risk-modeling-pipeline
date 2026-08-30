@@ -12,6 +12,7 @@ from train import (
     load_and_validate_data,
     rule_based_predict,
     run_classification,
+    run_regression,
     split_classification_data,
     split_regression_data,
 )
@@ -150,3 +151,32 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "feature_importance.png",
     ]:
         assert (output_dir / name).stat().st_size > 0
+
+
+def test_regression_selects_alpha_and_saves_bounded_predictions(
+    finance_df,
+    tmp_path,
+):
+    sample = finance_df.head(1_200)
+    x_train, x_test, y_train, y_test = split_regression_data(sample)
+    output_dir = tmp_path / "artifacts"
+
+    result = run_regression(x_train, x_test, y_train, y_test, output_dir)
+
+    assert set(result["test_metrics"]) == {"Ridge", "Lasso"}
+    assert set(result["selected_alpha"]) == {"Ridge", "Lasso"}
+    assert set(result["cv_rmse"]["Ridge"]) == {
+        "0.01",
+        "0.1",
+        "1",
+        "10",
+        "100",
+    }
+    for metrics in result["test_metrics"].values():
+        assert {"rmse", "mae", "r2"} <= metrics.keys()
+        assert metrics["rmse"] > 0
+        assert metrics["mae"] > 0
+    for predictions in result["predictions"].values():
+        assert predictions.between(0, 1000).all()
+    assert (output_dir / "credit_score_predictions.csv").is_file()
+    assert (output_dir / "regularization_coefficients.png").stat().st_size > 0

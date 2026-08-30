@@ -11,19 +11,24 @@ from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import Lasso, LogisticRegression, Ridge
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     RocCurveDisplay,
     accuracy_score,
     f1_score,
+    mean_absolute_error,
     precision_score,
     recall_score,
+    r2_score,
+    root_mean_squared_error,
     roc_auc_score,
 )
 from sklearn.model_selection import (
     GridSearchCV,
+    KFold,
     StratifiedKFold,
+    cross_val_score,
     cross_validate,
     train_test_split,
 )
@@ -52,6 +57,7 @@ NUMERIC_FEATURES = [
 CATEGORICAL_FEATURES = ["credit_card_count"]
 TARGET_COLUMNS = ["credit_score", "is_overdue"]
 REQUIRED_COLUMNS = FEATURE_COLUMNS + TARGET_COLUMNS
+ALPHAS = [0.01, 0.1, 1, 10, 100]
 
 
 def load_and_validate_data(path: str | Path) -> pd.DataFrame:
@@ -386,4 +392,144 @@ def run_classification(
         "best_cv_f1": float(search.best_score_),
         "feature_importance": feature_importance,
         "predictions": prediction_table,
+    }
+
+
+def _regularized_pipeline(model_name: str, alpha: float) -> Pipeline:
+    if model_name == "Ridge":
+        estimator = Ridge(alpha=alpha)
+    else:
+        estimator = Lasso(
+            alpha=alpha,
+            max_iter=20_000,
+            random_state=RANDOM_STATE,
+        )
+    return Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            ("model", estimator),
+        ]
+    )
+
+
+def _save_coefficient_paths(
+    coefficients: dict[str, dict[str, dict[str, float]]],
+    output_path: Path,
+) -> None:
+    figure, axes = plt.subplots(1, 2, figsize=(15, 6), sharey=True)
+    for axis, model_name in zip(axes, ["Ridge", "Lasso"]):
+        first_alpha = str(ALPHAS[0])
+        feature_names = coefficients[model_name][first_alpha].keys()
+        for feature_name in feature_names:
+            values = [
+                coefficients[model_name][str(alpha)][feature_name]
+                for alpha in ALPHAS
+            ]
+            axis.plot(ALPHAS, values, marker="o", label=feature_name)
+        axis.axhline(0, color="black", linewidth=0.7)
+        axis.set_xscale("log")
+        axis.set_title(f"{model_name} Coefficient Paths")
+        axis.set_xlabel("Alpha")
+        axis.set_ylabel("Coefficient in standardized feature space")
+        axis.legend(fontsize=6, ncol=2)
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
+def run_regression(
+    x_train: pd.DataFrame,
+    x_test: pd.DataFrame,
+    y_train: pd.Series,
+    y_test: pd.Series,
+    output_dir: str | Path,
+) -> dict:
+    """Select Ridge/Lasso alpha on Train CV and evaluate once on Test."""
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    cv = KFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    cv_rmse: dict[str, dict[str, float]] = {"Ridge": {}, "Lasso": {}}
+    coefficients: dict[str, dict[str, dict[str, float]]] = {
+        "Ridge": {},
+        "Lasso": {},
+    }
+
+    for model_name in ["Ridge", "Lasso"]:
+        for alpha in ALPHAS:
+            pipeline = _regularized_pipeline(model_name, alpha)
+            scores = cross_val_score(
+                pipeline,
+                x_train,
+                y_train,
+                scoring="neg_root_mean_squared_error",
+                cv=cv,
+                n_jobs=-1,
+            )
+            alpha_key = str(alpha)
+            cv_rmse[model_name][alpha_key] = float(-scores.mean())
+
+            pipeline.fit(x_train, y_train)
+            feature_names = pipeline.named_steps[
+                "preprocessor"
+            ].get_feature_names_out()
+            model_coefficients = pipeline.named_steps["model"].coef_
+            coefficients[model_name][alpha_key] = {
+                feature.replace("numeric__", "").replace(
+                    "categorical__",
+                    "",
+                ): float(coefficient)
+                for feature, coefficient in zip(
+                    feature_names,
+                    model_coefficients,
+                )
+            }
+
+    selected_alpha = {
+        model_name: float(
+            min(cv_rmse[model_name], key=cv_rmse[model_name].get)
+        )
+        for model_name in ["Ridge", "Lasso"]
+    }
+    test_metrics: dict[str, dict[str, float]] = {}
+    clipped_predictions: dict[str, pd.Series] = {}
+
+    for model_name in ["Ridge", "Lasso"]:
+        final_model = _regularized_pipeline(
+            model_name,
+            selected_alpha[model_name],
+        )
+        final_model.fit(x_train, y_train)
+        raw_predictions = final_model.predict(x_test)
+        test_metrics[model_name] = {
+            "rmse": float(root_mean_squared_error(y_test, raw_predictions)),
+            "mae": float(mean_absolute_error(y_test, raw_predictions)),
+            "r2": float(r2_score(y_test, raw_predictions)),
+        }
+        clipped_predictions[model_name] = pd.Series(
+            np.clip(raw_predictions, 0, 1000),
+            name=model_name,
+        )
+
+    _save_coefficient_paths(
+        coefficients,
+        destination / "regularization_coefficients.png",
+    )
+    prediction_table = pd.DataFrame(
+        {
+            "actual_credit_score": y_test.to_numpy(),
+            "ridge_prediction": clipped_predictions["Ridge"].to_numpy(),
+            "lasso_prediction": clipped_predictions["Lasso"].to_numpy(),
+        }
+    )
+    prediction_table.to_csv(
+        destination / "credit_score_predictions.csv",
+        index=False,
+    )
+
+    return {
+        "cv_rmse": cv_rmse,
+        "selected_alpha": selected_alpha,
+        "test_metrics": test_metrics,
+        "coefficients": coefficients,
+        "predictions": clipped_predictions,
     }
