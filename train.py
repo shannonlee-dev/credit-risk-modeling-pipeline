@@ -2,8 +2,15 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
+import tempfile
 from time import perf_counter
+
+os.environ.setdefault(
+    "MPLCONFIGDIR",
+    str(Path(tempfile.gettempdir()) / "credit-risk-matplotlib-cache"),
+)
 
 import matplotlib
 import numpy as np

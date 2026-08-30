@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 
 import pandas as pd
 import pytest
@@ -202,3 +205,20 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     assert "predictions" not in report["regression"]
     assert (output_dir / "classification_predictions.csv").is_file()
     assert (output_dir / "credit_score_predictions.csv").is_file()
+
+
+def test_import_uses_writable_matplotlib_cache():
+    environment = os.environ.copy()
+    environment["HOME"] = "/proc/credit-risk-unwritable-home"
+    environment.pop("MPLCONFIGDIR", None)
+
+    completed = subprocess.run(
+        [sys.executable, "-c", "import train"],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert "temporary cache directory" not in completed.stderr
