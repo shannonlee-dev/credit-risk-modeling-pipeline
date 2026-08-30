@@ -1,5 +1,7 @@
 """Train and evaluate credit-risk classification and regression models."""
 
+import argparse
+import json
 from pathlib import Path
 from time import perf_counter
 
@@ -245,6 +247,7 @@ def run_classification(
     y_test: pd.Series,
     output_dir: str | Path,
     grid: dict | None = None,
+    fast: bool = False,
 ) -> dict:
     """Compare rule, linear, and ensemble overdue-risk classifiers."""
     destination = Path(output_dir)
@@ -294,11 +297,20 @@ def run_classification(
     logistic.fit(x_train, y_train)
     forest.fit(x_train, y_train)
 
-    parameter_grid = grid or {
-        "model__n_estimators": [100, 200],
-        "model__max_depth": [None, 8, 16],
-        "model__min_samples_split": [2, 5],
-    }
+    if grid is not None:
+        parameter_grid = grid
+    elif fast:
+        parameter_grid = {
+            "model__n_estimators": [20],
+            "model__max_depth": [8],
+            "model__min_samples_split": [2],
+        }
+    else:
+        parameter_grid = {
+            "model__n_estimators": [100, 200],
+            "model__max_depth": [None, 8, 16],
+            "model__min_samples_split": [2, 5],
+        }
     search = GridSearchCV(
         clone(forest),
         parameter_grid,
@@ -533,3 +545,79 @@ def run_regression(
         "coefficients": coefficients,
         "predictions": clipped_predictions,
     }
+
+
+def _metrics_report(result: dict) -> dict:
+    return {
+        "data_distribution": result["data_distribution"],
+        "classification": {
+            key: value
+            for key, value in result["classification"].items()
+            if key != "predictions"
+        },
+        "regression": {
+            key: value
+            for key, value in result["regression"].items()
+            if key != "predictions"
+        },
+    }
+
+
+def run_analysis(
+    data_path: str | Path = "finance_data.csv",
+    output_dir: str | Path = "artifacts",
+    fast: bool = False,
+) -> dict:
+    """Run the complete leakage-safe analysis and save its artifacts."""
+    df = load_and_validate_data(data_path)
+    classification_split = split_classification_data(df)
+    regression_split = split_regression_data(df)
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    result = {
+        "data_distribution": {
+            "all": class_distribution(df["is_overdue"]),
+            "train": class_distribution(classification_split[2]),
+            "test": class_distribution(classification_split[3]),
+        },
+        "classification": run_classification(
+            *classification_split,
+            destination,
+            fast=fast,
+        ),
+        "regression": run_regression(*regression_split, destination),
+    }
+    report = _metrics_report(result)
+    (destination / "metrics.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return result
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="신용 위험 분류·회귀 모델을 학습하고 평가합니다."
+    )
+    parser.add_argument("--data", default="finance_data.csv")
+    parser.add_argument("--output-dir", default="artifacts")
+    args = parser.parse_args()
+
+    try:
+        result = run_analysis(args.data, args.output_dir)
+    except (FileNotFoundError, ValueError) as error:
+        parser.error(str(error))
+
+    print("전체 분석 완료")
+    for split_name, distribution in result["data_distribution"].items():
+        print(
+            f"{split_name}: 정상={distribution['count_0']}, "
+            f"연체={distribution['count_1']}, "
+            f"양성비율={distribution['positive_rate']:.2%}"
+        )
+    print(f"결과 저장 위치: {Path(args.output_dir).resolve()}")
+
+
+if __name__ == "__main__":
+    main()

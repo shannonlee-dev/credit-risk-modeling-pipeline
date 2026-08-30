@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pytest
 from sklearn.compose import ColumnTransformer
@@ -11,6 +13,7 @@ from train import (
     class_distribution,
     load_and_validate_data,
     rule_based_predict,
+    run_analysis,
     run_classification,
     run_regression,
     split_classification_data,
@@ -180,3 +183,22 @@ def test_regression_selects_alpha_and_saves_bounded_predictions(
         assert predictions.between(0, 1000).all()
     assert (output_dir / "credit_score_predictions.csv").is_file()
     assert (output_dir / "regularization_coefficients.png").stat().st_size > 0
+
+
+def test_run_analysis_saves_serializable_metrics_and_predictions(
+    finance_df,
+    tmp_path,
+):
+    data_path = tmp_path / "finance.csv"
+    finance_df.head(1_200).to_csv(data_path, index=False)
+    output_dir = tmp_path / "artifacts"
+
+    result = run_analysis(data_path, output_dir, fast=True)
+
+    assert set(result) == {"data_distribution", "classification", "regression"}
+    assert set(result["data_distribution"]) == {"all", "train", "test"}
+    report = json.loads((output_dir / "metrics.json").read_text(encoding="utf-8"))
+    assert "predictions" not in report["classification"]
+    assert "predictions" not in report["regression"]
+    assert (output_dir / "classification_predictions.csv").is_file()
+    assert (output_dir / "credit_score_predictions.csv").is_file()
