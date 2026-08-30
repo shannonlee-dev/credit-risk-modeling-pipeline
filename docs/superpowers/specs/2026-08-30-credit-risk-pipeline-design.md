@@ -30,7 +30,7 @@
 머신러닝 모델은 다음 두 가지다.
 
 - Logistic Regression: `class_weight="balanced"`로 불균형을 보정하고 5-fold 교차검증을 수행한다.
-- Random Forest: `class_weight="balanced"`를 고정한 기본 하이퍼파라미터 모델의 성능을 먼저 측정한 뒤, 같은 가중치 설정에서 100개 이하 조합의 `GridSearchCV(cv=5)`로 `n_estimators`, `max_depth`, `min_samples_split`을 탐색한다. 기본 모델과 튜닝 모델의 성능 차이로 최적화 효과를 정량화한다.
+- Random Forest: `class_weight="balanced"`를 고정한 기본 하이퍼파라미터 모델의 성능을 먼저 측정한 뒤, 같은 가중치 설정에서 100개 이하 조합의 `GridSearchCV(cv=5)`로 `n_estimators`, `max_depth`, `min_samples_split`을 탐색한다. GridSearchCV의 모델 선택은 Train Set 내부 교차검증 결과만 사용하며, Test Set은 기본 모델과 최종 튜닝 모델의 일반화 성능을 한 번씩 확인하는 용도로만 사용한다. 두 결과의 차이로 최적화 효과를 정량화한다.
 
 불균형 처리는 SMOTE 대신 `class_weight="balanced"`를 사용한다. 데이터를 합성하지 않고 학습 시 손실 계산에서 소수 클래스의 중요도를 높이며 Pipeline을 단순하게 유지하기 위해서다. README에서 SMOTE와 class weight의 장단점을 비교하고, class weight는 학습 과정에만 영향을 주며 Test Set 자체의 분포는 변경하지 않는다고 명시한다.
 
@@ -40,9 +40,9 @@ Random Forest는 여러 결정트리의 예측을 결합해 단일 트리의 높
 
 ## 회귀 설계
 
-Ridge와 Lasso에 각각 `0.01`, `0.1`, `1`, `10`, `100`의 Alpha를 적용한다. 각 조합을 동일한 Train/Test 데이터와 전처리 파이프라인으로 학습해 RMSE, MAE, R²를 비교하고, 5-fold 교차검증의 평균 RMSE가 가장 낮은 Alpha를 모델별 대표값으로 선택한다.
+Ridge와 Lasso에 각각 `0.01`, `0.1`, `1`, `10`, `100`의 Alpha를 적용한다. Alpha 선택은 Train Set 내부의 5-fold 교차검증 평균 RMSE만을 기준으로 수행한다. 선택된 Alpha의 최종 모델을 전체 Train Set에 다시 학습한 뒤 Test Set은 최종 RMSE, MAE, R² 산출에 한 번만 사용한다. Alpha별 계수 변화는 Train Set에서 학습한 모델을 기준으로 시각화한다.
 
-모든 예측값은 금융 점수 범위에 맞게 0~1000으로 제한하여 내보낸다. 각 Alpha에서 전처리 후 특성명을 기준으로 표준화 공간의 모델 계수를 추출해 Ridge와 Lasso 계수 변화 그래프를 생성하고 L1/L2 차이를 README에서 실제 결과와 연결해 설명한다.
+회귀 모델의 성능 지표는 모델의 원시 예측값을 기준으로 산출하여 범위를 벗어난 오차를 숨기지 않는다. 사용자에게 제공하거나 파일에 저장하는 최종 신용점수 예측값만 0~1000으로 제한한다. 각 Alpha에서 전처리 후 특성명을 기준으로 표준화 공간의 모델 계수를 추출해 Ridge와 Lasso 계수 변화 그래프를 생성하고 L1/L2 차이를 README에서 실제 결과와 연결해 설명한다.
 
 ## 산출물과 오류 처리
 
