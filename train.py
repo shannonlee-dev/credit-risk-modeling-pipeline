@@ -1,13 +1,37 @@
 """Train and evaluate credit-risk classification and regression models."""
 
 from pathlib import Path
+from time import perf_counter
 
+import matplotlib
+import numpy as np
 import pandas as pd
+import seaborn as sns
+from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    RocCurveDisplay,
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedKFold,
+    cross_validate,
+    train_test_split,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt  # noqa: E402
 
 RANDOM_STATE = 42
 FEATURE_COLUMNS = [
@@ -117,3 +141,249 @@ def rule_based_predict(row: pd.Series) -> int:
     if row["age"] < 25 and row["debt_ratio"] > 0.75:
         return 1
     return 0
+
+
+def evaluate_classifier(
+    y_true: pd.Series,
+    predictions: np.ndarray,
+    scores: np.ndarray,
+    prediction_latency_ms: float,
+) -> dict[str, float]:
+    """Calculate classification metrics on an untouched test target."""
+    return {
+        "accuracy": float(accuracy_score(y_true, predictions)),
+        "precision": float(
+            precision_score(y_true, predictions, zero_division=0)
+        ),
+        "recall": float(recall_score(y_true, predictions, zero_division=0)),
+        "f1": float(f1_score(y_true, predictions, zero_division=0)),
+        "roc_auc": float(roc_auc_score(y_true, scores)),
+        "prediction_latency_ms": float(prediction_latency_ms),
+    }
+
+
+def _average_latency_ms(predictor, repeats: int = 5) -> float:
+    predictor()
+    started = perf_counter()
+    for _ in range(repeats):
+        predictor()
+    return (perf_counter() - started) * 1000 / repeats
+
+
+def _save_confusion_matrices(
+    y_test: pd.Series,
+    predictions: dict[str, np.ndarray],
+    output_path: Path,
+) -> None:
+    figure, axes = plt.subplots(1, 2, figsize=(10, 4))
+    for axis, (name, values) in zip(axes, predictions.items()):
+        ConfusionMatrixDisplay.from_predictions(
+            y_test,
+            values,
+            display_labels=["Normal", "Overdue"],
+            cmap="Blues",
+            colorbar=False,
+            ax=axis,
+        )
+        axis.set_title(name)
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
+def _save_roc_curves(
+    y_test: pd.Series,
+    scores: dict[str, np.ndarray],
+    output_path: Path,
+) -> None:
+    figure, axis = plt.subplots(figsize=(7, 6))
+    for name, values in scores.items():
+        RocCurveDisplay.from_predictions(y_test, values, name=name, ax=axis)
+    axis.plot([0, 1], [0, 1], "k--", label="Random")
+    axis.set_title("Overdue Risk ROC Curves")
+    axis.legend(loc="lower right")
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
+def _save_feature_importance(model: Pipeline, output_path: Path) -> dict[str, float]:
+    preprocessor = model.named_steps["preprocessor"]
+    feature_names = [
+        name.replace("numeric__", "").replace("categorical__", "")
+        for name in preprocessor.get_feature_names_out()
+    ]
+    importances = model.named_steps["model"].feature_importances_
+    importance = (
+        pd.DataFrame({"feature": feature_names, "importance": importances})
+        .sort_values("importance", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    figure, axis = plt.subplots(figsize=(8, 6))
+    sns.barplot(data=importance, x="importance", y="feature", ax=axis)
+    axis.set_title("Tuned Random Forest Feature Importance")
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+    return {
+        row.feature: float(row.importance)
+        for row in importance.itertuples(index=False)
+    }
+
+
+def run_classification(
+    x_train: pd.DataFrame,
+    x_test: pd.DataFrame,
+    y_train: pd.Series,
+    y_test: pd.Series,
+    output_dir: str | Path,
+    grid: dict | None = None,
+) -> dict:
+    """Compare rule, linear, and ensemble overdue-risk classifiers."""
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    logistic = Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            (
+                "model",
+                LogisticRegression(
+                    class_weight="balanced",
+                    max_iter=2000,
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ]
+    )
+    forest = Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            (
+                "model",
+                RandomForestClassifier(
+                    n_estimators=100,
+                    class_weight="balanced",
+                    random_state=RANDOM_STATE,
+                    n_jobs=-1,
+                ),
+            ),
+        ]
+    )
+
+    cv = StratifiedKFold(
+        n_splits=5,
+        shuffle=True,
+        random_state=RANDOM_STATE,
+    )
+    cv_scores = cross_validate(
+        logistic,
+        x_train,
+        y_train,
+        scoring={"f1": "f1", "roc_auc": "roc_auc"},
+        cv=cv,
+        n_jobs=-1,
+    )
+    logistic.fit(x_train, y_train)
+    forest.fit(x_train, y_train)
+
+    parameter_grid = grid or {
+        "model__n_estimators": [100, 200],
+        "model__max_depth": [None, 8, 16],
+        "model__min_samples_split": [2, 5],
+    }
+    search = GridSearchCV(
+        clone(forest),
+        parameter_grid,
+        scoring="f1",
+        cv=cv,
+        n_jobs=-1,
+        refit=True,
+    )
+    search.fit(x_train, y_train)
+    tuned_forest = search.best_estimator_
+
+    rule_predictions = x_test.apply(rule_based_predict, axis=1).to_numpy()
+    logistic_scores = logistic.predict_proba(x_test)[:, 1]
+    forest_scores = forest.predict_proba(x_test)[:, 1]
+    tuned_scores = tuned_forest.predict_proba(x_test)[:, 1]
+    logistic_predictions = (logistic_scores >= 0.5).astype(int)
+    forest_predictions = (forest_scores >= 0.5).astype(int)
+    tuned_predictions = (tuned_scores >= 0.5).astype(int)
+
+    latencies = {
+        "Rule Baseline": _average_latency_ms(
+            lambda: x_test.apply(rule_based_predict, axis=1).to_numpy()
+        ),
+        "Logistic Regression": _average_latency_ms(
+            lambda: logistic.predict_proba(x_test)
+        ),
+        "Random Forest": _average_latency_ms(
+            lambda: forest.predict_proba(x_test)
+        ),
+        "Random Forest (Tuned)": _average_latency_ms(
+            lambda: tuned_forest.predict_proba(x_test)
+        ),
+    }
+    predictions = {
+        "Rule Baseline": rule_predictions,
+        "Logistic Regression": logistic_predictions,
+        "Random Forest": forest_predictions,
+        "Random Forest (Tuned)": tuned_predictions,
+    }
+    scores = {
+        "Rule Baseline": rule_predictions.astype(float),
+        "Logistic Regression": logistic_scores,
+        "Random Forest": forest_scores,
+        "Random Forest (Tuned)": tuned_scores,
+    }
+    metrics = {
+        name: evaluate_classifier(
+            y_test,
+            predictions[name],
+            scores[name],
+            latencies[name],
+        )
+        for name in predictions
+    }
+
+    _save_confusion_matrices(
+        y_test,
+        {
+            "Logistic Regression": logistic_predictions,
+            "Random Forest (Tuned)": tuned_predictions,
+        },
+        destination / "confusion_matrix.png",
+    )
+    _save_roc_curves(y_test, scores, destination / "roc_curve.png")
+    feature_importance = _save_feature_importance(
+        tuned_forest,
+        destination / "feature_importance.png",
+    )
+
+    prediction_table = pd.DataFrame(
+        {
+            "actual_is_overdue": y_test.to_numpy(),
+            "rule_prediction": rule_predictions,
+            "logistic_probability": logistic_scores,
+            "random_forest_probability": forest_scores,
+            "overdue_probability": tuned_scores,
+        }
+    )
+    prediction_table.to_csv(
+        destination / "classification_predictions.csv",
+        index=False,
+    )
+
+    return {
+        "metrics": metrics,
+        "logistic_cv": {
+            "f1_mean": float(cv_scores["test_f1"].mean()),
+            "roc_auc_mean": float(cv_scores["test_roc_auc"].mean()),
+        },
+        "best_params": search.best_params_,
+        "best_cv_f1": float(search.best_score_),
+        "feature_importance": feature_importance,
+        "predictions": prediction_table,
+    }

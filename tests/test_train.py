@@ -11,6 +11,7 @@ from train import (
     class_distribution,
     load_and_validate_data,
     rule_based_predict,
+    run_classification,
     split_classification_data,
     split_regression_data,
 )
@@ -99,3 +100,53 @@ def test_missing_columns_are_reported(tmp_path):
 
     with pytest.raises(ValueError, match="누락된 필수 열"):
         load_and_validate_data(path)
+
+
+def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path):
+    sample = finance_df.head(1_200)
+    x_train, x_test, y_train, y_test = split_classification_data(sample)
+    output_dir = tmp_path / "artifacts"
+
+    result = run_classification(
+        x_train,
+        x_test,
+        y_train,
+        y_test,
+        output_dir,
+        grid={
+            "model__n_estimators": [20],
+            "model__max_depth": [8],
+            "model__min_samples_split": [2],
+        },
+    )
+
+    assert set(result["metrics"]) == {
+        "Rule Baseline",
+        "Logistic Regression",
+        "Random Forest",
+        "Random Forest (Tuned)",
+    }
+    for metrics in result["metrics"].values():
+        assert {
+            "accuracy",
+            "precision",
+            "recall",
+            "f1",
+            "roc_auc",
+            "prediction_latency_ms",
+        } <= metrics.keys()
+        assert 0 <= metrics["f1"] <= 1
+        assert 0 <= metrics["roc_auc"] <= 1
+    assert result["best_params"] == {
+        "model__max_depth": 8,
+        "model__min_samples_split": 2,
+        "model__n_estimators": 20,
+    }
+    assert result["predictions"]["overdue_probability"].between(0, 1).all()
+    assert (output_dir / "classification_predictions.csv").is_file()
+    for name in [
+        "confusion_matrix.png",
+        "roc_curve.png",
+        "feature_importance.png",
+    ]:
+        assert (output_dir / name).stat().st_size > 0
