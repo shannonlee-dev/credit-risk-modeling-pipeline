@@ -163,21 +163,26 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         assert 0 <= metrics["roc_auc"] <= 1
     assert result["best_params"]["model__n_estimators"] == 200
     logistic_c_analysis = result["logistic_c_analysis"]
-    assert LOGISTIC_C_VALUES == [0.01, 0.1, 1.0, 10.0, 100.0]
+    assert LOGISTIC_C_VALUES == [0.001, 0.003, 0.01, 0.03, 0.1]
     assert set(logistic_c_analysis) == {str(value) for value in LOGISTIC_C_VALUES}
     for values in logistic_c_analysis.values():
         assert 0 <= values["cv_roc_auc_mean"] <= 1
         assert values["cv_roc_auc_std"] >= 0
         assert 0 <= values["cv_f1_mean"] <= 1
     assert result["selected_logistic_c"] in LOGISTIC_C_VALUES
-    assert RF_MAX_DEPTH_VALUES == [6, 8, 10, 12, None]
-    assert RF_MIN_SAMPLES_SPLIT_VALUES == [2, 5, 10, 20]
-    assert len(RF_MAX_DEPTH_VALUES) * len(RF_MIN_SAMPLES_SPLIT_VALUES) == 20
+    assert RF_MAX_DEPTH_VALUES == [8]
+    assert RF_MIN_SAMPLES_SPLIT_VALUES == [5, 10, 20, 40, 80]
+    assert len(RF_MAX_DEPTH_VALUES) * len(RF_MIN_SAMPLES_SPLIT_VALUES) == 5
     assert result["best_params"]["model__max_depth"] in RF_MAX_DEPTH_VALUES
     assert (
         result["best_params"]["model__min_samples_split"]
         in RF_MIN_SAMPLES_SPLIT_VALUES
     )
+    split_analysis = result["random_forest_min_samples_split_analysis"]
+    assert set(split_analysis) == {str(value) for value in RF_MIN_SAMPLES_SPLIT_VALUES}
+    for values in split_analysis.values():
+        assert 0 <= values["cv_roc_auc_mean"] <= 1
+        assert values["cv_roc_auc_std"] >= 0
     saturation = result["random_forest_saturation"]
     assert len(saturation) >= 5
     assert set(saturation) == {"25", "50", "100", "200", "300", "500"}

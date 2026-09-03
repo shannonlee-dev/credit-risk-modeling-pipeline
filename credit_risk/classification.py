@@ -30,10 +30,10 @@ from credit_risk.preprocessing import build_preprocessor
 
 DEFAULT_THRESHOLD = 0.5
 RECALL_FLOORS = [0.80, 0.85, 0.90, 0.95]
-LOGISTIC_C_VALUES = [0.01, 0.1, 1.0, 10.0, 100.0]
+LOGISTIC_C_VALUES = [0.001, 0.003, 0.01, 0.03, 0.1]
 N_ESTIMATOR_VALUES = [25, 50, 100, 200, 300, 500]
-RF_MAX_DEPTH_VALUES = [6, 8, 10, 12, None]
-RF_MIN_SAMPLES_SPLIT_VALUES = [2, 5, 10, 20]
+RF_MAX_DEPTH_VALUES = [8]
+RF_MIN_SAMPLES_SPLIT_VALUES = [5, 10, 20, 40, 80]
 RF_LOCAL_REFINEMENT_GRID = {
     "model__n_estimators": [200],
     "model__max_depth": RF_MAX_DEPTH_VALUES,
@@ -276,6 +276,17 @@ def train_classification(
     )
     search.fit(x_train, y_train)
     tuned_forest = search.best_estimator_
+    random_forest_min_samples_split_analysis = {
+        str(params["model__min_samples_split"]): {
+            "cv_roc_auc_mean": float(mean_score),
+            "cv_roc_auc_std": float(std_score),
+        }
+        for params, mean_score, std_score in zip(
+            search.cv_results_["params"],
+            search.cv_results_["mean_test_score"],
+            search.cv_results_["std_test_score"],
+        )
+    }
     latency_batch = x_train.iloc[: min(2_000, len(x_train))]
     random_forest_saturation = _random_forest_saturation_analysis(
         forest,
@@ -456,6 +467,9 @@ def train_classification(
         "best_params": search.best_params_,
         "best_cv_roc_auc": float(search.best_score_),
         "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),
+        "random_forest_min_samples_split_analysis": (
+            random_forest_min_samples_split_analysis
+        ),
         "random_forest_saturation": random_forest_saturation,
         "feature_importance": _feature_importance(tuned_forest),
         "threshold_analysis": threshold_analysis,
