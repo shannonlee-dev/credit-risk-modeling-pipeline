@@ -1,6 +1,5 @@
 from pandas.testing import assert_frame_equal
 
-from data_gen import generate_finance_data as legacy_generate_finance_data
 from scripts.generate_data import EXPECTED_COLUMNS, generate_finance_data
 
 
@@ -25,7 +24,3 @@ def test_generate_finance_data_uses_the_new_default_output_path(
     generate_finance_data()
 
     assert (tmp_path / "data" / "generated" / "finance_data.csv").is_file()
-
-
-def test_legacy_data_gen_module_re_exports_the_generator():
-    assert legacy_generate_finance_data is generate_finance_data

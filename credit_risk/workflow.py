@@ -23,7 +23,6 @@ from credit_risk.reporting import (
     save_regression_artifacts,
 )
 
-LEGACY_DATA_PATH = Path("finance_data.csv")
 _METRICS_FILENAME = "metrics.json"
 
 
@@ -68,10 +67,7 @@ def run_analysis(
     fast: bool = False,
 ) -> dict:
     """Run the analysis, optionally using reduced classification candidates."""
-    source = Path(data_path)
-    if source == DEFAULT_DATA_PATH and not source.exists() and LEGACY_DATA_PATH.exists():
-        source = LEGACY_DATA_PATH
-    df = load_and_validate_data(source)
+    df = load_and_validate_data(data_path)
     classification_split = split_classification_data(df)
     regression_split = split_regression_data(df)
     destination = Path(output_dir)

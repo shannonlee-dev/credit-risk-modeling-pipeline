@@ -1,52 +1,10 @@
-"""Backward-compatible CLI for the modular credit-risk pipeline."""
+"""Command-line entry point for the credit-risk pipeline."""
 
 import argparse
 from pathlib import Path
 
-from credit_risk.classification import (
-    evaluate_classifier,
-    rule_based_predict,
-    train_classification,
-)
 from credit_risk.constants import DEFAULT_ARTIFACTS_DIR, DEFAULT_DATA_PATH
-from credit_risk.data import (
-    CATEGORICAL_FEATURES,
-    FEATURE_COLUMNS,
-    NUMERIC_FEATURES,
-    RANDOM_STATE,
-    REQUIRED_COLUMNS,
-    TARGET_COLUMNS,
-    class_distribution,
-    load_and_validate_data,
-    split_classification_data,
-    split_regression_data,
-)
-from credit_risk.preprocessing import build_preprocessor
-from credit_risk.regression import ALPHAS, train_regression
-from credit_risk.reporting import metrics_report as _metrics_report
-from credit_risk.workflow import run_analysis, run_classification, run_regression
-
-__all__ = [
-    "ALPHAS",
-    "CATEGORICAL_FEATURES",
-    "FEATURE_COLUMNS",
-    "NUMERIC_FEATURES",
-    "RANDOM_STATE",
-    "REQUIRED_COLUMNS",
-    "TARGET_COLUMNS",
-    "build_preprocessor",
-    "class_distribution",
-    "evaluate_classifier",
-    "load_and_validate_data",
-    "rule_based_predict",
-    "run_analysis",
-    "run_classification",
-    "run_regression",
-    "split_classification_data",
-    "split_regression_data",
-    "train_classification",
-    "train_regression",
-]
+from credit_risk.workflow import run_analysis
 
 
 def main() -> None:

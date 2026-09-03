@@ -19,7 +19,7 @@ uv run python train.py
 uv run python -m pytest -v
 ```
 
-`pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. `data/generated/finance_data.csv`와 예측 CSV는 생성 파일이며 Git에서 제외됩니다. 기존 `python data_gen.py` 명령과 루트 `finance_data.csv` 입력도 호환을 위해 유지됩니다.
+`pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. `data/generated/finance_data.csv`와 예측 CSV는 생성 파일이며 Git에서 제외됩니다.
 
 테스트나 smoke run에서는 Python API의 `run_analysis(..., fast=True)`를 사용할 수 있습니다. 이 모드는 5-fold 평가 방식은 유지하고 Logistic C, RF `min_samples_split`, 트리 수 민감도 후보만 줄입니다. 커밋된 정식 산출물은 기본 모드로 생성합니다.
 
@@ -84,7 +84,6 @@ Tuned Random Forest는 `n_estimators=100`을 선택했습니다. 200개로 늘�
 ```text
 scripts/generate_data.py       # 재현 가능한 가상 데이터 생성
 data/generated/                # 생성된 가상 금융 데이터
-data_gen.py                    # 이전 생성 명령 호환 진입점
 train.py                       # 명령줄 실행 진입점
 credit_risk/
   data.py                      # 스키마, 검증, 데이터 분할

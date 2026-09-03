@@ -7,22 +7,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from data_gen import generate_finance_data
-from train import (
+from credit_risk.classification import rule_based_predict
+from credit_risk.data import (
     CATEGORICAL_FEATURES,
     FEATURE_COLUMNS,
     NUMERIC_FEATURES,
-    build_preprocessor,
     class_distribution,
     load_and_validate_data,
-    rule_based_predict,
-    run_analysis,
-    run_classification,
-    run_regression,
     split_classification_data,
     split_regression_data,
 )
+from credit_risk.preprocessing import build_preprocessor
 from credit_risk.reporting import _classification_confusion_predictions
+from credit_risk.workflow import run_analysis, run_classification, run_regression
+from scripts.generate_data import generate_finance_data
 
 
 @pytest.fixture(scope="module")
