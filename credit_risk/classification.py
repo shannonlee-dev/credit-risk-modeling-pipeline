@@ -35,6 +35,9 @@ LOGISTIC_C_VALUES = [0.001, 0.003, 0.01, 0.03, 0.1]
 N_ESTIMATOR_VALUES = [25, 50, 100, 200, 300, 500]
 RF_MAX_DEPTH_VALUES = [8]
 RF_MIN_SAMPLES_SPLIT_VALUES = [5, 10, 20, 40, 80]
+FAST_LOGISTIC_C_VALUES = [0.01, 0.1]
+FAST_N_ESTIMATOR_VALUES = [50, 100]
+FAST_RF_MIN_SAMPLES_SPLIT_VALUES = [20, 40]
 RF_LOCAL_REFINEMENT_GRID = {
     "model__n_estimators": [100],
     "model__max_depth": RF_MAX_DEPTH_VALUES,
@@ -144,6 +147,7 @@ def _random_forest_saturation_analysis(
     cv: StratifiedKFold,
     best_params: dict[str, object],
     latency_batch: pd.DataFrame,
+    n_estimator_values: list[int],
 ) -> dict[str, dict[str, float]]:
     """Measure tree-count sensitivity with the selected non-tree settings."""
     fixed_params = {
@@ -151,7 +155,7 @@ def _random_forest_saturation_analysis(
         "model__min_samples_split": best_params["model__min_samples_split"],
     }
     saturation = {}
-    for n_estimators in N_ESTIMATOR_VALUES:
+    for n_estimators in n_estimator_values:
         candidate = clone(forest).set_params(
             **fixed_params,
             model__n_estimators=n_estimators,
@@ -182,10 +186,11 @@ def _analyze_logistic_c_values(
     x_train: pd.DataFrame,
     y_train: pd.Series,
     cv: StratifiedKFold,
+    c_values: list[float],
 ) -> tuple[dict[str, dict[str, float]], float]:
     """Select logistic regularization using Train CV ROC-AUC only."""
     analysis = {}
-    for c_value in LOGISTIC_C_VALUES:
+    for c_value in c_values:
         scores = cross_validate(
             clone(logistic).set_params(model__C=c_value),
             x_train,
@@ -200,10 +205,21 @@ def _analyze_logistic_c_values(
             "cv_f1_mean": float(scores["test_f1"].mean()),
         }
     selected_c = min(
-        LOGISTIC_C_VALUES,
+        c_values,
         key=lambda c_value: (-analysis[str(c_value)]["cv_roc_auc_mean"], c_value),
     )
     return analysis, selected_c
+
+
+def _selected_threshold_metrics(sweep: pd.DataFrame) -> dict[str, float]:
+    """Return the selected Train-OOF operating point."""
+    selected = sweep.loc[sweep["is_selected"]].iloc[0]
+    return {
+        "threshold": float(selected["threshold"]),
+        "oof_precision": float(selected["precision"]),
+        "oof_recall": float(selected["recall"]),
+        "oof_f1": float(selected["f1"]),
+    }
 
 
 def train_classification(
@@ -214,7 +230,7 @@ def train_classification(
     grid: dict | None = None,
     fast: bool = False,
 ) -> dict:
-    """Train and evaluate overdue-risk classifiers without writing files."""
+    """Train classifiers; fast mode trims candidate ranges for smoke/CI runs."""
     logistic = Pipeline(
         [
             ("preprocessor", build_preprocessor()),
@@ -244,11 +260,14 @@ def train_classification(
     )
 
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    logistic_c_values = FAST_LOGISTIC_C_VALUES if fast else LOGISTIC_C_VALUES
+    n_estimator_values = FAST_N_ESTIMATOR_VALUES if fast else N_ESTIMATOR_VALUES
     logistic_c_analysis, selected_logistic_c = _analyze_logistic_c_values(
         logistic,
         x_train,
         y_train,
         cv=cv,
+        c_values=logistic_c_values,
     )
     logistic = logistic.set_params(model__C=selected_logistic_c)
     logistic.fit(x_train, y_train)
@@ -256,6 +275,11 @@ def train_classification(
 
     if grid is not None:
         parameter_grid = grid
+    elif fast:
+        parameter_grid = {
+            **RF_LOCAL_REFINEMENT_GRID,
+            "model__min_samples_split": FAST_RF_MIN_SAMPLES_SPLIT_VALUES,
+        }
     else:
         parameter_grid = RF_LOCAL_REFINEMENT_GRID
     search = GridSearchCV(
@@ -287,6 +311,7 @@ def train_classification(
         cv,
         search.best_params_,
         latency_batch,
+        n_estimator_values,
     )
     tuned_forest_cv_f1 = cross_validate(
         tuned_forest,
@@ -385,7 +410,9 @@ def train_classification(
     return {
         "metrics": metrics,
         "logistic_cv": {
-            "f1_mean": logistic_c_analysis[str(selected_logistic_c)]["cv_f1_mean"],
+            "cv_f1_default_threshold_mean": logistic_c_analysis[
+                str(selected_logistic_c)
+            ]["cv_f1_mean"],
             "roc_auc_mean": logistic_c_analysis[str(selected_logistic_c)][
                 "cv_roc_auc_mean"
             ],
@@ -395,6 +422,12 @@ def train_classification(
         "selected_classification_model": SELECTED_CLASSIFICATION_MODEL,
         "selected_logistic_threshold": SELECTED_LOGISTIC_THRESHOLD,
         "selected_random_forest_threshold": SELECTED_RANDOM_FOREST_THRESHOLD,
+        "threshold_selection": {
+            "Logistic Regression": _selected_threshold_metrics(threshold_sweep),
+            "Random Forest (Tuned)": _selected_threshold_metrics(
+                random_forest_threshold_sweep
+            ),
+        },
         "best_params": search.best_params_,
         "best_cv_roc_auc": float(search.best_score_),
         "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),

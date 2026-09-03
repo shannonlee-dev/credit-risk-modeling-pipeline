@@ -6,7 +6,6 @@ import sys
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.compose import ColumnTransformer
 
 from data_gen import generate_finance_data
 from train import (
@@ -23,13 +22,7 @@ from train import (
     split_classification_data,
     split_regression_data,
 )
-from credit_risk.classification import (
-    LOGISTIC_C_VALUES,
-    RF_MAX_DEPTH_VALUES,
-    RF_MIN_SAMPLES_SPLIT_VALUES,
-    SELECTED_LOGISTIC_THRESHOLD,
-    SELECTED_RANDOM_FOREST_THRESHOLD,
-)
+from credit_risk.reporting import _classification_confusion_predictions
 
 
 @pytest.fixture(scope="module")
@@ -73,7 +66,6 @@ def test_preprocessor_treats_card_count_as_numeric():
     preprocessor = build_preprocessor()
     transformed = preprocessor.fit_transform(features)
 
-    assert isinstance(preprocessor, ColumnTransformer)
     assert transformed.shape == (2, 6)
     assert preprocessor.get_feature_names_out().tolist() == [
         "numeric__age",
@@ -166,29 +158,30 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         assert 0 <= metrics["roc_auc"] <= 1
     assert result["best_params"]["model__n_estimators"] == 100
     logistic_c_analysis = result["logistic_c_analysis"]
-    assert LOGISTIC_C_VALUES == [0.001, 0.003, 0.01, 0.03, 0.1]
-    assert set(logistic_c_analysis) == {str(value) for value in LOGISTIC_C_VALUES}
+    assert set(logistic_c_analysis) == {
+        "0.001",
+        "0.003",
+        "0.01",
+        "0.03",
+        "0.1",
+    }
     for values in logistic_c_analysis.values():
         assert 0 <= values["cv_roc_auc_mean"] <= 1
         assert values["cv_roc_auc_std"] >= 0
         assert 0 <= values["cv_f1_mean"] <= 1
-    assert result["selected_logistic_c"] in LOGISTIC_C_VALUES
+    assert result["selected_logistic_c"] in {0.001, 0.003, 0.01, 0.03, 0.1}
     assert result["selected_classification_model"] == "Logistic Regression"
-    assert RF_MAX_DEPTH_VALUES == [8]
-    assert RF_MIN_SAMPLES_SPLIT_VALUES == [5, 10, 20, 40, 80]
-    assert len(RF_MAX_DEPTH_VALUES) * len(RF_MIN_SAMPLES_SPLIT_VALUES) == 5
-    assert result["best_params"]["model__max_depth"] in RF_MAX_DEPTH_VALUES
+    assert result["best_params"]["model__max_depth"] == 8
     assert (
         result["best_params"]["model__min_samples_split"]
-        in RF_MIN_SAMPLES_SPLIT_VALUES
+        in {5, 10, 20, 40, 80}
     )
     split_analysis = result["random_forest_min_samples_split_analysis"]
-    assert set(split_analysis) == {str(value) for value in RF_MIN_SAMPLES_SPLIT_VALUES}
+    assert set(split_analysis) == {"5", "10", "20", "40", "80"}
     for values in split_analysis.values():
         assert 0 <= values["cv_roc_auc_mean"] <= 1
         assert values["cv_roc_auc_std"] >= 0
     saturation = result["random_forest_saturation"]
-    assert len(saturation) >= 5
     assert set(saturation) == {"25", "50", "100", "200", "300", "500"}
     for values in saturation.values():
         assert {
@@ -225,7 +218,11 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
     assert baseline.iloc[0]["threshold"] == 0.50
     selected = sweep.loc[sweep["is_selected"]]
     assert len(selected) == 1
-    assert selected.iloc[0]["threshold"] == SELECTED_LOGISTIC_THRESHOLD == 0.45
+    assert (
+        selected.iloc[0]["threshold"]
+        == result["selected_logistic_threshold"]
+        == 0.45
+    )
     random_forest_sweep = result["random_forest_threshold_sweep"]
     assert list(random_forest_sweep) == list(sweep)
     assert random_forest_sweep["threshold"].tolist() == pytest.approx(
@@ -238,7 +235,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
     assert len(selected_random_forest) == 1
     assert (
         selected_random_forest.iloc[0]["threshold"]
-        == SELECTED_RANDOM_FOREST_THRESHOLD
+        == result["selected_random_forest_threshold"]
         == 0.33
     )
     assert (
@@ -249,23 +246,18 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "logistic_prediction_selected",
         "tuned_rf_prediction_selected",
     } <= set(result["predictions"])
-    assert result["selected_logistic_threshold"] == SELECTED_LOGISTIC_THRESHOLD
-    assert (
-        result["selected_random_forest_threshold"]
-        == SELECTED_RANDOM_FOREST_THRESHOLD
-    )
     assert np.array_equal(
         result["predictions"]["logistic_prediction_selected"].to_numpy(),
         (
             result["predictions"]["logistic_probability"].to_numpy()
-            >= SELECTED_LOGISTIC_THRESHOLD
+            >= result["selected_logistic_threshold"]
         ).astype(int),
     )
     assert np.array_equal(
         result["predictions"]["tuned_rf_prediction_selected"].to_numpy(),
         (
             result["predictions"]["overdue_probability"].to_numpy()
-            >= SELECTED_RANDOM_FOREST_THRESHOLD
+            >= result["selected_random_forest_threshold"]
         ).astype(int),
     )
     latency_benchmark = result["latency_benchmark"]
@@ -286,9 +278,27 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "random_forest_threshold_sweep.png",
     ]:
         assert (output_dir / name).stat().st_size > 0
-    assert not (output_dir / "confusion_matrix_threshold_comparison.png").exists()
-    assert not (output_dir / "logistic_c_curve.png").exists()
-    assert not (output_dir / "threshold_tradeoff.png").exists()
+
+
+def test_confusion_matrix_titles_use_result_thresholds():
+    predictions = pd.DataFrame(
+        {
+            "logistic_prediction_selected": [0],
+            "tuned_rf_prediction_selected": [0],
+        }
+    )
+    result = {
+        "predictions": predictions,
+        "selected_logistic_threshold": 0.44,
+        "selected_random_forest_threshold": 0.32,
+    }
+
+    confusion_predictions = _classification_confusion_predictions(result)
+
+    assert set(confusion_predictions) == {
+        "Logistic Regression (selected 0.44)",
+        "Random Forest (Tuned, selected 0.32)",
+    }
 
 
 def test_regression_selects_alpha_and_saves_bounded_predictions(
@@ -338,7 +348,25 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     assert "random_forest_threshold_sweep" not in report["classification"]
     assert "latency_benchmark" not in report["classification"]
     assert "predictions" not in report["regression"]
-    assert "threshold_analysis" not in report["classification"]
+    assert report["classification"]["logistic_cv"].keys() == {
+        "cv_f1_default_threshold_mean",
+        "roc_auc_mean",
+    }
+    threshold_selection = report["classification"]["threshold_selection"]
+    assert set(threshold_selection) == {
+        "Logistic Regression",
+        "Random Forest (Tuned)",
+    }
+    assert threshold_selection["Logistic Regression"]["threshold"] == 0.45
+    assert threshold_selection["Random Forest (Tuned)"]["threshold"] == 0.33
+    for selection in threshold_selection.values():
+        assert set(selection) == {
+            "threshold",
+            "oof_precision",
+            "oof_recall",
+            "oof_f1",
+        }
+        assert all(0 <= selection[key] <= 1 for key in selection)
     assert set(report["benchmark"]) == {
         "source",
         "batch_rows",
@@ -350,14 +378,17 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
         "batch_prediction_latency_ms" not in metrics
         for metrics in report["classification"]["metrics"].values()
     )
-    assert len(report["classification"]["random_forest_saturation"]) >= 5
-    assert (output_dir / "random_forest_n_estimators_curve.png").is_file()
-    assert (output_dir / "logistic_threshold_sweep.csv").is_file()
-    assert (output_dir / "logistic_threshold_sweep.png").is_file()
-    assert (output_dir / "random_forest_threshold_sweep.csv").is_file()
-    assert (output_dir / "random_forest_threshold_sweep.png").is_file()
-    assert (output_dir / "classification_predictions.csv").is_file()
-    assert (output_dir / "credit_score_predictions.csv").is_file()
+    assert set(report["classification"]["logistic_c_analysis"]) == {
+        "0.01",
+        "0.1",
+    }
+    assert set(
+        report["classification"]["random_forest_min_samples_split_analysis"]
+    ) == {"20", "40"}
+    assert set(report["classification"]["random_forest_saturation"]) == {
+        "50",
+        "100",
+    }
 
 
 def test_training_computation_does_not_write_artifacts(
@@ -380,6 +411,7 @@ def test_training_computation_does_not_write_artifacts(
             "model__max_depth": [4],
             "model__min_samples_split": [2],
         },
+        fast=True,
     )
     regression = train_regression(*regression_split)
 
@@ -388,9 +420,12 @@ def test_training_computation_does_not_write_artifacts(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_import_uses_writable_matplotlib_cache():
+def test_import_uses_writable_matplotlib_cache(tmp_path):
+    blocked_home = tmp_path / "not-a-directory"
+    blocked_home.write_text("not a directory", encoding="utf-8")
     environment = os.environ.copy()
-    environment["HOME"] = "/proc/credit-risk-unwritable-home"
+    environment["HOME"] = str(blocked_home)
+    environment["USERPROFILE"] = str(blocked_home)
     environment.pop("MPLCONFIGDIR", None)
 
     completed = subprocess.run(

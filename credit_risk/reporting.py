@@ -25,6 +25,23 @@ from matplotlib import pyplot as plt  # noqa: E402
 from credit_risk.regression import ALPHAS
 
 
+def _classification_confusion_predictions(
+    result: dict,
+) -> dict[str, np.ndarray]:
+    """Build confusion-matrix labels and predictions from selected thresholds."""
+    table = result["predictions"]
+    return {
+        (
+            "Logistic Regression "
+            f"(selected {result['selected_logistic_threshold']:.2f})"
+        ): table["logistic_prediction_selected"].to_numpy(),
+        (
+            "Random Forest (Tuned, selected "
+            f"{result['selected_random_forest_threshold']:.2f})"
+        ): table["tuned_rf_prediction_selected"].to_numpy(),
+    }
+
+
 def _save_confusion_matrices(
     y_test: pd.Series,
     predictions: dict[str, np.ndarray],
@@ -185,14 +202,7 @@ def save_classification_artifacts(
     table = result["predictions"]
     _save_confusion_matrices(
         y_test,
-        {
-            "Logistic Regression (selected 0.45)": table[
-                "logistic_prediction_selected"
-            ].to_numpy(),
-            "Random Forest (Tuned, selected 0.33)": table[
-                "tuned_rf_prediction_selected"
-            ].to_numpy(),
-        },
+        _classification_confusion_predictions(result),
         destination / "confusion_matrix.png",
     )
     _save_roc_curves(

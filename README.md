@@ -21,6 +21,8 @@ uv run python -m pytest -v
 
 `pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. `finance_data.csv`와 예측 CSV는 생성 파일이며 Git에서 제외됩니다.
 
+테스트나 smoke run에서는 Python API의 `run_analysis(..., fast=True)`를 사용할 수 있습니다. 이 모드는 5-fold 평가 방식은 유지하고 Logistic C, RF `min_samples_split`, 트리 수 민감도 후보만 줄입니다. 커밋된 정식 산출물은 기본 모드로 생성합니다.
+
 ## 평가 대상
 
 - 분류: 여섯 규칙 기반 기준선, 클래스 가중치를 적용한 로지스틱 회귀, 기본·튜닝 랜덤 포레스트

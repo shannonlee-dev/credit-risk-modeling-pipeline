@@ -59,7 +59,7 @@ def run_analysis(
     output_dir: str | Path = "artifacts",
     fast: bool = False,
 ) -> dict:
-    """Run the complete leakage-safe analysis and save its artifacts."""
+    """Run the analysis, optionally using reduced classification candidates."""
     df = load_and_validate_data(data_path)
     classification_split = split_classification_data(df)
     regression_split = split_regression_data(df)

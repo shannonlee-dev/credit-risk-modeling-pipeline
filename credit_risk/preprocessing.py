@@ -9,7 +9,7 @@ from credit_risk.data import NUMERIC_FEATURES
 
 
 def build_preprocessor() -> ColumnTransformer:
-    """Build numeric and categorical preprocessing paths."""
+    """Build the shared numeric preprocessing path."""
     numeric = Pipeline(
         [
             ("imputer", SimpleImputer(strategy="median")),

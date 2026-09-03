@@ -25,6 +25,8 @@
 
 Tuned Random Forest도 `n_estimators=100` 설정에서 동일한 Train OOF probability와 threshold grid로 별도 표와 그래프를 만들었습니다. Logistic `0.45`의 OOF Recall `94.59%`에 맞추기 위해 RF `0.33`을 선택했으며, RF OOF Recall은 `94.48%`입니다. 같은 OOF 조건에서 Logistic의 FP는 `1,131`건, RF는 `1,214`건이며 Precision/F1은 Logistic `44.56%`/`0.6058`, RF `42.79%`/`0.5890`입니다. 따라서 최종 분류 모델은 Logistic입니다. Holdout 레이블은 threshold 선택에 사용하지 않았고, 선택 후 한 번만 최종 평가에 사용했습니다. Holdout Recall은 Logistic `93.33%`, RF `91.25%`로 달라졌으므로 OOF의 유사 Recall 조건이 Holdout에서 동일하게 재현됐다고 주장하지 않습니다.
 
+이 OOF threshold 분석은 holdout leakage를 일으키지 않지만 완전히 편향 없는 nested OOF 추정도 아닙니다. 전체 Train의 CV 결과로 Logistic의 `C`와 RF hyperparameter를 먼저 고른 뒤, 같은 Train에서 선택된 설정의 OOF probability를 다시 생성했기 때문입니다. 개별 OOF 행은 해당 행을 학습하지 않은 모델에서 예측되지만 hyperparameter 선택에는 전체 Train-CV 정보가 간접적으로 반영됩니다. 완전히 독립적인 threshold 성능 추정이 필요하다면 nested CV나 별도 calibration/validation split을 사용해야 합니다. 이 프로젝트에서는 untouched holdout을 최종 평가용으로 유지하고 이 한계를 명시하는 수준으로 범위를 정했습니다.
+
 ## 랜덤 포레스트 트리 수 민감도 분석
 
 먼저 고정된 `n_estimators=100`, `max_depth=8`에서 `GridSearchCV`로 `min_samples_split`을 선택합니다. 이후 트리 수 민감도 분석에서는 `max_depth`와 선택된 `min_samples_split`을 고정하고, `n_estimators`만 25·50·100·200·300·500으로 변경해 동일한 학습 5-fold 교차검증에서 비교합니다. 이는 선택된 트리 수 이외 설정을 유지한 채 트리 수의 영향을 분리합니다. 하이퍼파라미터 선택 뒤 학습 교차검증을 재사용하므로 이 결과는 편향 없는 선택 후 성능 추정치가 아닌 기술적 민감도 분석입니다. 이 한계를 문서에 남기는 조건이라면 중첩 교차검증은 이 포트폴리오 프로젝트에는 과도합니다.
@@ -45,7 +47,7 @@ Tuned Random Forest도 `n_estimators=100` 설정에서 동일한 Train OOF proba
 
 ## 산출물
 
-- `artifacts/metrics.json`: 기계가 읽을 수 있는 지표, 선택된 파라미터, 회귀 기록, 단일 성능 측정 구역
+- `artifacts/metrics.json`: 기계가 읽을 수 있는 지표, 선택된 파라미터와 OOF threshold 요약, 회귀 기록, 단일 성능 측정 구역. `logistic_cv.cv_f1_default_threshold_mean`은 기본 threshold `0.50`의 Train-CV F1이며 선택 threshold의 OOF 지표와 구분됩니다.
 - `artifacts/confusion_matrix.png`: 선택된 Logistic `0.45`와 Tuned RF `0.33`의 Holdout FP/FN 비교
 - `artifacts/logistic_threshold_sweep.csv`, `logistic_threshold_sweep.png`: 선택 기록을 표시한 Logistic Train OOF threshold 표와 그래프
 - `artifacts/random_forest_threshold_sweep.csv`, `random_forest_threshold_sweep.png`: 선택 기록을 표시한 100-tree Tuned RF Train OOF threshold 표와 그래프
