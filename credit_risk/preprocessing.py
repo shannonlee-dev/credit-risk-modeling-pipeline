@@ -5,7 +5,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from credit_risk.data import NUMERIC_FEATURES
+from credit_risk.constants import NUMERIC_FEATURES
 
 
 def build_preprocessor() -> ColumnTransformer:

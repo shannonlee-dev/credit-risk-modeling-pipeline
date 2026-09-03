@@ -22,14 +22,27 @@ from sklearn.model_selection import (
 )
 from sklearn.pipeline import Pipeline
 
-from credit_risk.data import RANDOM_STATE
+from credit_risk.constants import (
+    AGE_COLUMN,
+    ANNUAL_INCOME_COLUMN,
+    CREDIT_CARD_COUNT_COLUMN,
+    CV_FOLDS,
+    DEBT_RATIO_COLUMN,
+    DEFAULT_CLASSIFICATION_THRESHOLD as DEFAULT_THRESHOLD,
+    LOGISTIC_REGRESSION_MODEL,
+    OVERDUE_COUNT_COLUMN,
+    RANDOM_FOREST_MODEL,
+    RANDOM_STATE,
+    RULE_BASELINE_MODEL,
+    SPENDING_SCORE_COLUMN,
+    TUNED_RANDOM_FOREST_MODEL,
+)
 from credit_risk.preprocessing import build_preprocessor
 
 
-DEFAULT_THRESHOLD = 0.5
 SELECTED_LOGISTIC_THRESHOLD = 0.45
 SELECTED_RANDOM_FOREST_THRESHOLD = 0.33
-SELECTED_CLASSIFICATION_MODEL = "Logistic Regression"
+SELECTED_CLASSIFICATION_MODEL = LOGISTIC_REGRESSION_MODEL
 SWEEP_THRESHOLDS = np.linspace(0.30, 0.60, 31)
 LOGISTIC_C_VALUES = [0.001, 0.003, 0.01, 0.03, 0.1]
 N_ESTIMATOR_VALUES = [25, 50, 100, 200, 300, 500]
@@ -38,26 +51,54 @@ RF_MIN_SAMPLES_SPLIT_VALUES = [5, 10, 20, 40, 80]
 FAST_LOGISTIC_C_VALUES = [0.01, 0.1]
 FAST_N_ESTIMATOR_VALUES = [50, 100]
 FAST_RF_MIN_SAMPLES_SPLIT_VALUES = [20, 40]
+_DEFAULT_RF_N_ESTIMATORS = 100
 RF_LOCAL_REFINEMENT_GRID = {
-    "model__n_estimators": [100],
+    "model__n_estimators": [_DEFAULT_RF_N_ESTIMATORS],
     "model__max_depth": RF_MAX_DEPTH_VALUES,
     "model__min_samples_split": RF_MIN_SAMPLES_SPLIT_VALUES,
 }
 
+_OVERDUE_COUNT_THRESHOLD = 2
+_HIGH_DEBT_RATIO = 0.80
+_MODERATE_DEBT_RATIO = 0.70
+_CARD_COUNT_DEBT_RATIO = 0.65
+_YOUNG_BORROWER_DEBT_RATIO = 0.75
+_LOW_INCOME = 4_500
+_VERY_LOW_INCOME = 2_500
+_HIGH_SPENDING_SCORE = 90
+_HIGH_CREDIT_CARD_COUNT = 8
+_YOUNG_AGE = 25
+_LOGISTIC_MAX_ITERATIONS = 2_000
+_LATENCY_REPEATS = 5
+_LATENCY_BATCH_SIZE = 2_000
+_MILLISECONDS_PER_SECOND = 1_000
+
 
 def rule_based_predict(row: pd.Series) -> int:
     """Classify overdue risk with six explicit business rules."""
-    if row["overdue_count_6m"] >= 2:
+    if row[OVERDUE_COUNT_COLUMN] >= _OVERDUE_COUNT_THRESHOLD:
         return 1
-    if row["debt_ratio"] > 0.80 and row["annual_income"] < 4500:
+    if (
+        row[DEBT_RATIO_COLUMN] > _HIGH_DEBT_RATIO
+        and row[ANNUAL_INCOME_COLUMN] < _LOW_INCOME
+    ):
         return 1
-    if row["annual_income"] < 2500:
+    if row[ANNUAL_INCOME_COLUMN] < _VERY_LOW_INCOME:
         return 1
-    if row["spending_score"] > 90 and row["debt_ratio"] > 0.70:
+    if (
+        row[SPENDING_SCORE_COLUMN] > _HIGH_SPENDING_SCORE
+        and row[DEBT_RATIO_COLUMN] > _MODERATE_DEBT_RATIO
+    ):
         return 1
-    if row["credit_card_count"] >= 8 and row["debt_ratio"] > 0.65:
+    if (
+        row[CREDIT_CARD_COUNT_COLUMN] >= _HIGH_CREDIT_CARD_COUNT
+        and row[DEBT_RATIO_COLUMN] > _CARD_COUNT_DEBT_RATIO
+    ):
         return 1
-    if row["age"] < 25 and row["debt_ratio"] > 0.75:
+    if (
+        row[AGE_COLUMN] < _YOUNG_AGE
+        and row[DEBT_RATIO_COLUMN] > _YOUNG_BORROWER_DEBT_RATIO
+    ):
         return 1
     return 0
 
@@ -84,12 +125,12 @@ def evaluate_classifier(
     }
 
 
-def _average_latency_ms(predictor, repeats: int = 5) -> float:
+def _average_latency_ms(predictor, repeats: int = _LATENCY_REPEATS) -> float:
     predictor()
     started = perf_counter()
     for _ in range(repeats):
         predictor()
-    return (perf_counter() - started) * 1000 / repeats
+    return (perf_counter() - started) * _MILLISECONDS_PER_SECOND / repeats
 
 
 def _feature_importance(model: Pipeline) -> dict[str, float]:
@@ -238,7 +279,7 @@ def train_classification(
                 "model",
                 LogisticRegression(
                     class_weight="balanced",
-                    max_iter=2000,
+                    max_iter=_LOGISTIC_MAX_ITERATIONS,
                     random_state=RANDOM_STATE,
                 ),
             ),
@@ -250,7 +291,7 @@ def train_classification(
             (
                 "model",
                 RandomForestClassifier(
-                    n_estimators=100,
+                    n_estimators=_DEFAULT_RF_N_ESTIMATORS,
                     class_weight="balanced",
                     random_state=RANDOM_STATE,
                     n_jobs=-1,
@@ -259,7 +300,11 @@ def train_classification(
         ]
     )
 
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    cv = StratifiedKFold(
+        n_splits=CV_FOLDS,
+        shuffle=True,
+        random_state=RANDOM_STATE,
+    )
     logistic_c_values = FAST_LOGISTIC_C_VALUES if fast else LOGISTIC_C_VALUES
     n_estimator_values = FAST_N_ESTIMATOR_VALUES if fast else N_ESTIMATOR_VALUES
     logistic_c_analysis, selected_logistic_c = _analyze_logistic_c_values(
@@ -303,7 +348,7 @@ def train_classification(
             search.cv_results_["std_test_score"],
         )
     }
-    latency_batch = x_train.iloc[: min(2_000, len(x_train))]
+    latency_batch = x_train.iloc[: min(_LATENCY_BATCH_SIZE, len(x_train))]
     random_forest_saturation = _random_forest_saturation_analysis(
         forest,
         x_train,
@@ -362,30 +407,30 @@ def train_classification(
     ).astype(int)
 
     latencies = {
-        "Rule Baseline": _average_latency_ms(
+        RULE_BASELINE_MODEL: _average_latency_ms(
             lambda: latency_batch.apply(rule_based_predict, axis=1).to_numpy()
         ),
-        "Logistic Regression": _average_latency_ms(
+        LOGISTIC_REGRESSION_MODEL: _average_latency_ms(
             lambda: logistic.predict_proba(latency_batch)
         ),
-        "Random Forest": _average_latency_ms(
+        RANDOM_FOREST_MODEL: _average_latency_ms(
             lambda: forest.predict_proba(latency_batch)
         ),
-        "Random Forest (Tuned)": _average_latency_ms(
+        TUNED_RANDOM_FOREST_MODEL: _average_latency_ms(
             lambda: tuned_forest.predict_proba(latency_batch)
         ),
     }
     predictions = {
-        "Rule Baseline": rule_predictions,
-        "Logistic Regression": logistic_predictions,
-        "Random Forest": forest_predictions,
-        "Random Forest (Tuned)": tuned_predictions,
+        RULE_BASELINE_MODEL: rule_predictions,
+        LOGISTIC_REGRESSION_MODEL: logistic_predictions,
+        RANDOM_FOREST_MODEL: forest_predictions,
+        TUNED_RANDOM_FOREST_MODEL: tuned_predictions,
     }
     scores = {
-        "Rule Baseline": rule_predictions.astype(float),
-        "Logistic Regression": logistic_scores,
-        "Random Forest": forest_scores,
-        "Random Forest (Tuned)": tuned_scores,
+        RULE_BASELINE_MODEL: rule_predictions.astype(float),
+        LOGISTIC_REGRESSION_MODEL: logistic_scores,
+        RANDOM_FOREST_MODEL: forest_scores,
+        TUNED_RANDOM_FOREST_MODEL: tuned_scores,
     }
     metrics = {
         name: evaluate_classifier(
@@ -423,8 +468,10 @@ def train_classification(
         "selected_logistic_threshold": SELECTED_LOGISTIC_THRESHOLD,
         "selected_random_forest_threshold": SELECTED_RANDOM_FOREST_THRESHOLD,
         "threshold_selection": {
-            "Logistic Regression": _selected_threshold_metrics(threshold_sweep),
-            "Random Forest (Tuned)": _selected_threshold_metrics(
+            LOGISTIC_REGRESSION_MODEL: _selected_threshold_metrics(
+                threshold_sweep
+            ),
+            TUNED_RANDOM_FOREST_MODEL: _selected_threshold_metrics(
                 random_forest_threshold_sweep
             ),
         },
@@ -441,7 +488,7 @@ def train_classification(
         "latency_benchmark": {
             "source": "training_feature_batch",
             "batch_rows": len(latency_batch),
-            "repeats": 5,
+            "repeats": _LATENCY_REPEATS,
         },
         "predictions": prediction_table,
     }

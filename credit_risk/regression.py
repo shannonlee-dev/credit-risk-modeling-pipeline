@@ -11,19 +11,28 @@ from sklearn.metrics import (
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.pipeline import Pipeline
 
-from credit_risk.data import RANDOM_STATE
+from credit_risk.constants import (
+    CREDIT_SCORE_MAX,
+    CREDIT_SCORE_MIN,
+    CV_FOLDS,
+    RIDGE_MODEL,
+    RANDOM_STATE,
+    REGRESSION_ALPHAS as ALPHAS,
+    REGRESSION_MODELS,
+)
 from credit_risk.preprocessing import build_preprocessor
 
-ALPHAS = [0.01, 0.1, 1, 10, 100]
+
+_LASSO_MAX_ITERATIONS = 20_000
 
 
 def _regularized_pipeline(model_name: str, alpha: float) -> Pipeline:
-    if model_name == "Ridge":
+    if model_name == RIDGE_MODEL:
         estimator = Ridge(alpha=alpha)
     else:
         estimator = Lasso(
             alpha=alpha,
-            max_iter=20_000,
+            max_iter=_LASSO_MAX_ITERATIONS,
             random_state=RANDOM_STATE,
         )
     return Pipeline(
@@ -41,14 +50,15 @@ def train_regression(
     y_test: pd.Series,
 ) -> dict:
     """Select and evaluate Ridge/Lasso models without writing files."""
-    cv = KFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
-    cv_rmse: dict[str, dict[str, float]] = {"Ridge": {}, "Lasso": {}}
+    cv = KFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    cv_rmse: dict[str, dict[str, float]] = {
+        model_name: {} for model_name in REGRESSION_MODELS
+    }
     coefficients: dict[str, dict[str, dict[str, float]]] = {
-        "Ridge": {},
-        "Lasso": {},
+        model_name: {} for model_name in REGRESSION_MODELS
     }
 
-    for model_name in ["Ridge", "Lasso"]:
+    for model_name in REGRESSION_MODELS:
         for alpha in ALPHAS:
             pipeline = _regularized_pipeline(model_name, alpha)
             scores = cross_val_score(
@@ -80,12 +90,12 @@ def train_regression(
 
     selected_alpha = {
         model_name: float(min(cv_rmse[model_name], key=cv_rmse[model_name].get))
-        for model_name in ["Ridge", "Lasso"]
+        for model_name in REGRESSION_MODELS
     }
     test_metrics: dict[str, dict[str, float]] = {}
     clipped_predictions: dict[str, pd.Series] = {}
 
-    for model_name in ["Ridge", "Lasso"]:
+    for model_name in REGRESSION_MODELS:
         final_model = _regularized_pipeline(
             model_name,
             selected_alpha[model_name],
@@ -98,7 +108,7 @@ def train_regression(
             "r2": float(r2_score(y_test, raw_predictions)),
         }
         clipped_predictions[model_name] = pd.Series(
-            np.clip(raw_predictions, 0, 1000),
+            np.clip(raw_predictions, CREDIT_SCORE_MIN, CREDIT_SCORE_MAX),
             name=model_name,
         )
 

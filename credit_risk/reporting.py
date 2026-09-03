@@ -22,7 +22,19 @@ from sklearn.metrics import (
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # noqa: E402
 
-from credit_risk.regression import ALPHAS
+from credit_risk.constants import (
+    DEFAULT_CLASSIFICATION_THRESHOLD,
+    LOGISTIC_REGRESSION_MODEL,
+    RANDOM_FOREST_MODEL,
+    REGRESSION_ALPHAS,
+    REGRESSION_MODELS,
+    RULE_BASELINE_MODEL,
+    TUNED_RANDOM_FOREST_MODEL,
+)
+
+
+_PLOT_DPI = 150
+_MAX_CONFUSION_MATRIX_COLUMNS = 2
 
 
 def _classification_confusion_predictions(
@@ -32,11 +44,11 @@ def _classification_confusion_predictions(
     table = result["predictions"]
     return {
         (
-            "Logistic Regression "
+            f"{LOGISTIC_REGRESSION_MODEL} "
             f"(selected {result['selected_logistic_threshold']:.2f})"
         ): table["logistic_prediction_selected"].to_numpy(),
         (
-            "Random Forest (Tuned, selected "
+            f"{RANDOM_FOREST_MODEL} (Tuned, selected "
             f"{result['selected_random_forest_threshold']:.2f})"
         ): table["tuned_rf_prediction_selected"].to_numpy(),
     }
@@ -47,7 +59,7 @@ def _save_confusion_matrices(
     predictions: dict[str, np.ndarray],
     output_path: Path,
 ) -> None:
-    columns = min(2, len(predictions))
+    columns = min(_MAX_CONFUSION_MATRIX_COLUMNS, len(predictions))
     rows = int(np.ceil(len(predictions) / columns))
     figure, axes = plt.subplots(rows, columns, figsize=(5 * columns, 4 * rows))
     for axis, (name, values) in zip(np.asarray(axes).reshape(-1), predictions.items()):
@@ -61,7 +73,7 @@ def _save_confusion_matrices(
         )
         axis.set_title(name)
     figure.tight_layout()
-    figure.savefig(output_path, dpi=150)
+    figure.savefig(output_path, dpi=_PLOT_DPI)
     plt.close(figure)
 
 
@@ -79,7 +91,12 @@ def _save_threshold_sweep(
             markersize=3,
             label=metric.capitalize(),
         )
-    axis.axvline(0.50, color="black", linestyle="--", label="Baseline 0.50")
+    axis.axvline(
+        DEFAULT_CLASSIFICATION_THRESHOLD,
+        color="black",
+        linestyle="--",
+        label=f"Baseline {DEFAULT_CLASSIFICATION_THRESHOLD:.2f}",
+    )
     if sweep["is_selected"].any():
         selected_threshold = sweep.loc[
             sweep["is_selected"], "threshold"
@@ -95,7 +112,7 @@ def _save_threshold_sweep(
     axis.set_title(f"{model_name} Threshold Sweep (Train OOF)")
     axis.legend()
     figure.tight_layout()
-    figure.savefig(output_path, dpi=150)
+    figure.savefig(output_path, dpi=_PLOT_DPI)
     plt.close(figure)
 
 
@@ -111,7 +128,7 @@ def _save_roc_curves(
     axis.set_title("Overdue Risk ROC Curves")
     axis.legend(loc="lower right")
     figure.tight_layout()
-    figure.savefig(output_path, dpi=150)
+    figure.savefig(output_path, dpi=_PLOT_DPI)
     plt.close(figure)
 
 
@@ -129,7 +146,7 @@ def _save_feature_importance(
     sns.barplot(data=importance, x="importance", y="feature", ax=axis)
     axis.set_title("Tuned Random Forest Feature Importance")
     figure.tight_layout()
-    figure.savefig(output_path, dpi=150)
+    figure.savefig(output_path, dpi=_PLOT_DPI)
     plt.close(figure)
 
 
@@ -162,7 +179,7 @@ def _save_random_forest_saturation_curve(
     axis.set_title("Random Forest Tree Count Sensitivity (Train CV)")
     axis.legend()
     figure.tight_layout()
-    figure.savefig(output_path, dpi=150)
+    figure.savefig(output_path, dpi=_PLOT_DPI)
     plt.close(figure)
 
 
@@ -171,15 +188,15 @@ def _save_coefficient_paths(
     output_path: Path,
 ) -> None:
     figure, axes = plt.subplots(1, 2, figsize=(15, 6), sharey=True)
-    for axis, model_name in zip(axes, ["Ridge", "Lasso"]):
-        first_alpha = str(ALPHAS[0])
+    for axis, model_name in zip(axes, REGRESSION_MODELS):
+        first_alpha = str(REGRESSION_ALPHAS[0])
         feature_names = coefficients[model_name][first_alpha].keys()
         for feature_name in feature_names:
             values = [
                 coefficients[model_name][str(alpha)][feature_name]
-                for alpha in ALPHAS
+                for alpha in REGRESSION_ALPHAS
             ]
-            axis.plot(ALPHAS, values, marker="o", label=feature_name)
+            axis.plot(REGRESSION_ALPHAS, values, marker="o", label=feature_name)
         axis.axhline(0, color="black", linewidth=0.7)
         axis.set_xscale("log")
         axis.set_title(f"{model_name} Coefficient Paths")
@@ -187,7 +204,7 @@ def _save_coefficient_paths(
         axis.set_ylabel("Coefficient in standardized feature space")
         axis.legend(fontsize=6, ncol=2)
     figure.tight_layout()
-    figure.savefig(output_path, dpi=150)
+    figure.savefig(output_path, dpi=_PLOT_DPI)
     plt.close(figure)
 
 
@@ -208,10 +225,10 @@ def save_classification_artifacts(
     _save_roc_curves(
         y_test,
         {
-            "Rule Baseline": table["rule_prediction"].to_numpy(dtype=float),
-            "Logistic Regression": table["logistic_probability"].to_numpy(),
-            "Random Forest": table["random_forest_probability"].to_numpy(),
-            "Random Forest (Tuned)": table["overdue_probability"].to_numpy(),
+            RULE_BASELINE_MODEL: table["rule_prediction"].to_numpy(dtype=float),
+            LOGISTIC_REGRESSION_MODEL: table["logistic_probability"].to_numpy(),
+            RANDOM_FOREST_MODEL: table["random_forest_probability"].to_numpy(),
+            TUNED_RANDOM_FOREST_MODEL: table["overdue_probability"].to_numpy(),
         },
         destination / "roc_curve.png",
     )
@@ -232,7 +249,7 @@ def save_classification_artifacts(
     _save_threshold_sweep(
         result["logistic_threshold_sweep"],
         destination / "logistic_threshold_sweep.png",
-        "Logistic Regression",
+        LOGISTIC_REGRESSION_MODEL,
     )
     result["random_forest_threshold_sweep"].to_csv(
         destination / "random_forest_threshold_sweep.csv",

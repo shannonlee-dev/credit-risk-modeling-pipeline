@@ -5,6 +5,11 @@ from pathlib import Path
 import pandas as pd
 
 from credit_risk.classification import train_classification
+from credit_risk.constants import (
+    CLASSIFICATION_TARGET,
+    DEFAULT_ARTIFACTS_DIR,
+    DEFAULT_DATA_PATH,
+)
 from credit_risk.data import (
     class_distribution,
     load_and_validate_data,
@@ -18,8 +23,8 @@ from credit_risk.reporting import (
     save_regression_artifacts,
 )
 
-DEFAULT_DATA_PATH = Path("data/generated/finance_data.csv")
 LEGACY_DATA_PATH = Path("finance_data.csv")
+_METRICS_FILENAME = "metrics.json"
 
 
 def run_classification(
@@ -59,7 +64,7 @@ def run_regression(
 
 def run_analysis(
     data_path: str | Path = DEFAULT_DATA_PATH,
-    output_dir: str | Path = "artifacts",
+    output_dir: str | Path = DEFAULT_ARTIFACTS_DIR,
     fast: bool = False,
 ) -> dict:
     """Run the analysis, optionally using reduced classification candidates."""
@@ -74,7 +79,7 @@ def run_analysis(
 
     result = {
         "data_distribution": {
-            "all": class_distribution(df["is_overdue"]),
+            "all": class_distribution(df[CLASSIFICATION_TARGET]),
             "train": class_distribution(classification_split[2]),
             "test": class_distribution(classification_split[3]),
         },
@@ -85,5 +90,5 @@ def run_analysis(
         ),
         "regression": run_regression(*regression_split, destination),
     }
-    save_metrics_report(result, destination / "metrics.json")
+    save_metrics_report(result, destination / _METRICS_FILENAME)
     return result

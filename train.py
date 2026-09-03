@@ -8,6 +8,7 @@ from credit_risk.classification import (
     rule_based_predict,
     train_classification,
 )
+from credit_risk.constants import DEFAULT_ARTIFACTS_DIR, DEFAULT_DATA_PATH
 from credit_risk.data import (
     CATEGORICAL_FEATURES,
     FEATURE_COLUMNS,
@@ -52,8 +53,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="신용 위험 분류·회귀 모델을 학습하고 평가합니다."
     )
-    parser.add_argument("--data", default="data/generated/finance_data.csv")
-    parser.add_argument("--output-dir", default="artifacts")
+    parser.add_argument("--data", default=str(DEFAULT_DATA_PATH))
+    parser.add_argument("--output-dir", default=str(DEFAULT_ARTIFACTS_DIR))
     args = parser.parse_args()
 
     try:

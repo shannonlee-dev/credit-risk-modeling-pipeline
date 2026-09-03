@@ -1,24 +1,45 @@
 """Generate the synthetic finance dataset used by the project."""
 
-from pathlib import Path
 import random  # Included to match the supplied generation environment.
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from credit_risk.constants import (
+    AGE_COLUMN,
+    ANNUAL_INCOME_COLUMN,
+    CLASSIFICATION_TARGET,
+    CREDIT_CARD_COUNT_COLUMN,
+    CREDIT_SCORE_MAX,
+    CREDIT_SCORE_MIN,
+    DATASET_COLUMNS as EXPECTED_COLUMNS,
+    DEFAULT_DATA_PATH as DEFAULT_OUTPUT_PATH,
+    DEBT_RATIO_COLUMN,
+    OVERDUE_COUNT_COLUMN,
+    RANDOM_STATE,
+    REGRESSION_TARGET,
+    SPENDING_SCORE_COLUMN,
+)
+
+
 N_SAMPLES = 10_000
-RANDOM_STATE = 42
-DEFAULT_OUTPUT_PATH = Path("data/generated/finance_data.csv")
-EXPECTED_COLUMNS = [
-    "age",
-    "annual_income",
-    "spending_score",
-    "debt_ratio",
-    "credit_card_count",
-    "overdue_count_6m",
-    "credit_score",
-    "is_overdue",
-]
+_AGE_RANGE = (20, 70)
+_ANNUAL_INCOME_MEAN = 5_000
+_ANNUAL_INCOME_STANDARD_DEVIATION = 2_000
+_MIN_ANNUAL_INCOME = 1_500
+_SPENDING_SCORE_RANGE = (1, 100)
+_DEBT_RATIO_RANGE = (0, 1)
+_CREDIT_CARD_COUNT_RANGE = (1, 10)
+_OVERDUE_COUNT_MEAN = 0.5
+_BASE_CREDIT_SCORE = 300
+_INCOME_SCALE = 100
+_INCOME_WEIGHT = 3
+_OVERDUE_PENALTY = 50
+_DEBT_RATIO_PENALTY = 100
+_CREDIT_SCORE_NOISE_STANDARD_DEVIATION = 30
+_OVERDUE_SCORE_QUANTILE = 0.15
+_OVERDUE_RANDOM_CUTOFF = 0.2
 
 
 def generate_finance_data(
@@ -28,30 +49,46 @@ def generate_finance_data(
     np.random.seed(RANDOM_STATE)
 
     data = {
-        "age": np.random.randint(20, 70, N_SAMPLES),
-        "annual_income": np.random.normal(5000, 2000, N_SAMPLES).round(0),
-        "spending_score": np.random.randint(1, 100, N_SAMPLES),
-        "debt_ratio": np.random.uniform(0, 1, N_SAMPLES).round(2),
-        "credit_card_count": np.random.randint(1, 10, N_SAMPLES),
-        "overdue_count_6m": np.random.poisson(0.5, N_SAMPLES),
+        AGE_COLUMN: np.random.randint(*_AGE_RANGE, N_SAMPLES),
+        ANNUAL_INCOME_COLUMN: np.random.normal(
+            _ANNUAL_INCOME_MEAN,
+            _ANNUAL_INCOME_STANDARD_DEVIATION,
+            N_SAMPLES,
+        ).round(0),
+        SPENDING_SCORE_COLUMN: np.random.randint(
+            *_SPENDING_SCORE_RANGE,
+            N_SAMPLES,
+        ),
+        DEBT_RATIO_COLUMN: np.random.uniform(
+            *_DEBT_RATIO_RANGE,
+            N_SAMPLES,
+        ).round(2),
+        CREDIT_CARD_COUNT_COLUMN: np.random.randint(
+            *_CREDIT_CARD_COUNT_RANGE,
+            N_SAMPLES,
+        ),
+        OVERDUE_COUNT_COLUMN: np.random.poisson(
+            _OVERDUE_COUNT_MEAN,
+            N_SAMPLES,
+        ),
     }
     df = pd.DataFrame(data)
-    df["annual_income"] = df["annual_income"].apply(
-        lambda value: max(value, 1500)
+    df[ANNUAL_INCOME_COLUMN] = df[ANNUAL_INCOME_COLUMN].apply(
+        lambda value: max(value, _MIN_ANNUAL_INCOME)
     )
 
-    df["credit_score"] = (
-        300
-        + (df["annual_income"] / 100) * 3
-        - (df["overdue_count_6m"] * 50)
-        - (df["debt_ratio"] * 100)
-        + np.random.normal(0, 30, N_SAMPLES)
-    ).clip(0, 1000).round(0)
+    df[REGRESSION_TARGET] = (
+        _BASE_CREDIT_SCORE
+        + (df[ANNUAL_INCOME_COLUMN] / _INCOME_SCALE) * _INCOME_WEIGHT
+        - (df[OVERDUE_COUNT_COLUMN] * _OVERDUE_PENALTY)
+        - (df[DEBT_RATIO_COLUMN] * _DEBT_RATIO_PENALTY)
+        + np.random.normal(0, _CREDIT_SCORE_NOISE_STANDARD_DEVIATION, N_SAMPLES)
+    ).clip(CREDIT_SCORE_MIN, CREDIT_SCORE_MAX).round(0)
 
-    threshold = df["credit_score"].quantile(0.15)
-    df["is_overdue"] = np.where(
-        (df["credit_score"] < threshold)
-        & (np.random.rand(N_SAMPLES) > 0.2),
+    threshold = df[REGRESSION_TARGET].quantile(_OVERDUE_SCORE_QUANTILE)
+    df[CLASSIFICATION_TARGET] = np.where(
+        (df[REGRESSION_TARGET] < threshold)
+        & (np.random.rand(N_SAMPLES) > _OVERDUE_RANDOM_CUTOFF),
         1,
         0,
     )
@@ -67,7 +104,8 @@ def main() -> None:
     df = generate_finance_data()
     print(f"데이터 생성 완료: {DEFAULT_OUTPUT_PATH}")
     print(f"전체 샘플 수: {len(df)}")
-    print(f"연체(1) 비율: {df['is_overdue'].mean() * 100:.2f}% (불균형 데이터 확인)")
+    overdue_rate = df[CLASSIFICATION_TARGET].mean() * 100
+    print(f"연체(1) 비율: {overdue_rate:.2f}% (불균형 데이터 확인)")
 
 
 if __name__ == "__main__":

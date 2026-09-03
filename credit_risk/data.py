@@ -5,26 +5,19 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-RANDOM_STATE = 42
-FEATURE_COLUMNS = [
-    "age",
-    "annual_income",
-    "spending_score",
-    "debt_ratio",
-    "overdue_count_6m",
-    "credit_card_count",
-]
-NUMERIC_FEATURES = [
-    "age",
-    "annual_income",
-    "spending_score",
-    "debt_ratio",
-    "overdue_count_6m",
-    "credit_card_count",
-]
-CATEGORICAL_FEATURES: list[str] = []
-TARGET_COLUMNS = ["credit_score", "is_overdue"]
-REQUIRED_COLUMNS = FEATURE_COLUMNS + TARGET_COLUMNS
+from credit_risk.constants import (
+    CATEGORICAL_FEATURES,
+    CLASSIFICATION_TARGET,
+    FEATURE_COLUMNS,
+    NUMERIC_FEATURES,
+    RANDOM_STATE,
+    REGRESSION_TARGET,
+    REQUIRED_COLUMNS,
+    TARGET_COLUMNS,
+)
+
+
+_TEST_SIZE = 0.2
 
 
 def load_and_validate_data(path: str | Path) -> pd.DataFrame:
@@ -47,9 +40,9 @@ def split_classification_data(df: pd.DataFrame):
     """Create a reproducible stratified classification split."""
     return train_test_split(
         df[FEATURE_COLUMNS],
-        df["is_overdue"],
-        test_size=0.2,
-        stratify=df["is_overdue"],
+        df[CLASSIFICATION_TARGET],
+        test_size=_TEST_SIZE,
+        stratify=df[CLASSIFICATION_TARGET],
         random_state=RANDOM_STATE,
     )
 
@@ -58,8 +51,8 @@ def split_regression_data(df: pd.DataFrame):
     """Create a reproducible regression split."""
     return train_test_split(
         df[FEATURE_COLUMNS],
-        df["credit_score"],
-        test_size=0.2,
+        df[REGRESSION_TARGET],
+        test_size=_TEST_SIZE,
         random_state=RANDOM_STATE,
     )
 
