@@ -18,6 +18,9 @@ from credit_risk.reporting import (
     save_regression_artifacts,
 )
 
+DEFAULT_DATA_PATH = Path("data/generated/finance_data.csv")
+LEGACY_DATA_PATH = Path("finance_data.csv")
+
 
 def run_classification(
     x_train: pd.DataFrame,
@@ -55,12 +58,15 @@ def run_regression(
 
 
 def run_analysis(
-    data_path: str | Path = "finance_data.csv",
+    data_path: str | Path = DEFAULT_DATA_PATH,
     output_dir: str | Path = "artifacts",
     fast: bool = False,
 ) -> dict:
     """Run the analysis, optionally using reduced classification candidates."""
-    df = load_and_validate_data(data_path)
+    source = Path(data_path)
+    if source == DEFAULT_DATA_PATH and not source.exists() and LEGACY_DATA_PATH.exists():
+        source = LEGACY_DATA_PATH
+    df = load_and_validate_data(source)
     classification_split = split_classification_data(df)
     regression_split = split_regression_data(df)
     destination = Path(output_dir)

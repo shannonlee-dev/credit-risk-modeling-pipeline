@@ -52,7 +52,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="신용 위험 분류·회귀 모델을 학습하고 평가합니다."
     )
-    parser.add_argument("--data", default="finance_data.csv")
+    parser.add_argument("--data", default="data/generated/finance_data.csv")
     parser.add_argument("--output-dir", default="artifacts")
     args = parser.parse_args()
 

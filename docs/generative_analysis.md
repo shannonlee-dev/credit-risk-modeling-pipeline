@@ -2,7 +2,7 @@
 
 이 문서는 이 프로젝트의 가상 데이터가 **어떤 수학적 구조로 생성되었는지**, 그리고 학습된 모델이 그 구조를 **얼마나 잘 다시 찾아냈는지**를 설명합니다.
 
-이 분석은 [`data_gen.py`](../data_gen.py)에 이미 공개된 생성 공식을 이용한 **사후 진단(post-hoc diagnostic)** 입니다.
+이 분석은 [`scripts/generate_data.py`](../scripts/generate_data.py)에 이미 공개된 생성 공식을 이용한 **사후 진단(post-hoc diagnostic)** 입니다.
 
 생성 공식을 모델 학습, 하이퍼파라미터 선택, threshold 선택에 사용하지 않았으며, 아래 oracle 결과도 새로운 모델 선택 근거로 사용하지 않습니다.
 
@@ -10,7 +10,7 @@
 
 ## 1. 신용점수는 어떻게 만들어지는가
 
-`data_gen.py`에서 가상의 `credit_score`는 다음 구조로 생성됩니다.
+`scripts/generate_data.py`에서 가상의 `credit_score`는 다음 구조로 생성됩니다.
 
 $$
 S
