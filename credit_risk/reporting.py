@@ -7,7 +7,7 @@ import tempfile
 
 os.environ.setdefault(
     "MPLCONFIGDIR",
-    str(Path(tempfile.gettempdir()) / "credit-risk-matplotlib-cache"),
+    tempfile.mkdtemp(prefix="credit-risk-matplotlib-"),
 )
 
 import matplotlib
@@ -213,11 +213,11 @@ def save_classification_artifacts(
         {
             "Logistic (0.5)": table["logistic_prediction_default"].to_numpy(),
             "Logistic (Recall ≥ 0.90 CV, illustrative)": table[
-                "logistic_prediction_tuned"
+                "logistic_prediction_illustrative_recall_090"
             ].to_numpy(),
             "Tuned RF (0.5)": table["tuned_rf_prediction_default"].to_numpy(),
             "Tuned RF (Recall ≥ 0.90 CV, illustrative)": table[
-                "tuned_rf_prediction_tuned"
+                "tuned_rf_prediction_illustrative_recall_090"
             ].to_numpy(),
         },
         destination / "confusion_matrix_threshold_comparison.png",

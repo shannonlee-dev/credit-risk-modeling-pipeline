@@ -55,7 +55,7 @@ def evaluate_classifier(
     y_true: pd.Series,
     predictions: np.ndarray,
     scores: np.ndarray,
-    prediction_latency_ms: float,
+    batch_prediction_latency_ms: float,
 ) -> dict[str, float]:
     """Calculate classification metrics on an untouched test target."""
     y_values = np.asarray(y_true)
@@ -67,7 +67,7 @@ def evaluate_classifier(
         "recall": float(recall_score(y_true, predictions, zero_division=0)),
         "f1": float(f1_score(y_true, predictions, zero_division=0)),
         "roc_auc": float(roc_auc_score(y_true, scores)),
-        "prediction_latency_ms": float(prediction_latency_ms),
+        "batch_prediction_latency_ms": float(batch_prediction_latency_ms),
         "fn": int(np.sum((y_values == 1) & (predictions == 0))),
         "fp": int(np.sum((y_values == 0) & (predictions == 1))),
     }
@@ -144,6 +144,7 @@ def _random_forest_saturation_analysis(
     y_train: pd.Series,
     cv: StratifiedKFold,
     best_params: dict[str, object],
+    latency_batch: pd.DataFrame,
     fast: bool,
 ) -> dict[str, dict[str, float]]:
     """Measure tree-count sensitivity with the selected non-tree settings."""
@@ -172,8 +173,8 @@ def _random_forest_saturation_analysis(
             "cv_roc_auc_std": float(scores["test_roc_auc"].std()),
             "cv_f1_mean": float(scores["test_f1"].mean()),
             "fit_time_seconds": float(scores["fit_time"].mean()),
-            "prediction_latency_ms": float(
-                _average_latency_ms(lambda: candidate.predict_proba(x_train))
+            "batch_prediction_latency_ms": float(
+                _average_latency_ms(lambda: candidate.predict_proba(latency_batch))
             ),
         }
     return saturation
@@ -252,12 +253,14 @@ def train_classification(
     )
     search.fit(x_train, y_train)
     tuned_forest = search.best_estimator_
+    latency_batch = x_train.iloc[: min(2_000, len(x_train))]
     random_forest_saturation = _random_forest_saturation_analysis(
         forest,
         x_train,
         y_train,
         cv,
         search.best_params_,
+        latency_batch,
         fast,
     )
     tuned_forest_cv_f1 = cross_validate(
@@ -305,11 +308,11 @@ def train_classification(
     logistic_predictions = (logistic_scores >= DEFAULT_THRESHOLD).astype(int)
     forest_predictions = (forest_scores >= DEFAULT_THRESHOLD).astype(int)
     tuned_predictions = (tuned_scores >= DEFAULT_THRESHOLD).astype(int)
-    logistic_tuned_predictions = (
+    logistic_illustrative_recall_090_predictions = (
         logistic_scores >= logistic_recall_scenarios["0.90"]["threshold"]
     ).astype(int)
     logistic_f1_predictions = (logistic_scores >= logistic_f1_threshold).astype(int)
-    tuned_forest_tuned_predictions = (
+    tuned_forest_illustrative_recall_090_predictions = (
         tuned_scores >= tuned_forest_recall_scenarios["0.90"]["threshold"]
     ).astype(int)
     tuned_forest_f1_predictions = (
@@ -318,14 +321,16 @@ def train_classification(
 
     latencies = {
         "Rule Baseline": _average_latency_ms(
-            lambda: x_test.apply(rule_based_predict, axis=1).to_numpy()
+            lambda: latency_batch.apply(rule_based_predict, axis=1).to_numpy()
         ),
         "Logistic Regression": _average_latency_ms(
-            lambda: logistic.predict_proba(x_test)
+            lambda: logistic.predict_proba(latency_batch)
         ),
-        "Random Forest": _average_latency_ms(lambda: forest.predict_proba(x_test)),
+        "Random Forest": _average_latency_ms(
+            lambda: forest.predict_proba(latency_batch)
+        ),
         "Random Forest (Tuned)": _average_latency_ms(
-            lambda: tuned_forest.predict_proba(x_test)
+            lambda: tuned_forest.predict_proba(latency_batch)
         ),
     }
     predictions = {
@@ -405,11 +410,15 @@ def train_classification(
             "rule_prediction": rule_predictions,
             "logistic_probability": logistic_scores,
             "logistic_prediction_default": logistic_predictions,
-            "logistic_prediction_tuned": logistic_tuned_predictions,
+            "logistic_prediction_illustrative_recall_090": (
+                logistic_illustrative_recall_090_predictions
+            ),
             "random_forest_probability": forest_scores,
             "overdue_probability": tuned_scores,
             "tuned_rf_prediction_default": tuned_predictions,
-            "tuned_rf_prediction_tuned": tuned_forest_tuned_predictions,
+            "tuned_rf_prediction_illustrative_recall_090": (
+                tuned_forest_illustrative_recall_090_predictions
+            ),
         }
     )
     return {
@@ -427,6 +436,11 @@ def train_classification(
         "threshold_tradeoff": {
             "target": y_train.to_numpy(),
             "scores": tuned_forest_oof_scores,
+        },
+        "latency_benchmark": {
+            "source": "training_feature_batch",
+            "batch_rows": len(latency_batch),
+            "repeats": 5,
         },
         "predictions": prediction_table,
     }

@@ -157,7 +157,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
             "recall",
             "f1",
             "roc_auc",
-            "prediction_latency_ms",
+            "batch_prediction_latency_ms",
         } <= metrics.keys()
         assert 0 <= metrics["f1"] <= 1
         assert 0 <= metrics["roc_auc"] <= 1
@@ -175,13 +175,13 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
             "cv_roc_auc_std",
             "cv_f1_mean",
             "fit_time_seconds",
-            "prediction_latency_ms",
+            "batch_prediction_latency_ms",
         } <= values.keys()
         assert 0 <= values["cv_roc_auc_mean"] <= 1
         assert values["cv_roc_auc_std"] >= 0
         assert 0 <= values["cv_f1_mean"] <= 1
         assert values["fit_time_seconds"] > 0
-        assert values["prediction_latency_ms"] > 0
+        assert values["batch_prediction_latency_ms"] > 0
     assert result["predictions"]["overdue_probability"].between(0, 1).all()
     assert set(result["threshold_analysis"]) == {
         "Logistic Regression",
@@ -217,10 +217,16 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
             )
     assert {
         "logistic_prediction_default",
-        "logistic_prediction_tuned",
+        "logistic_prediction_illustrative_recall_090",
         "tuned_rf_prediction_default",
-        "tuned_rf_prediction_tuned",
+        "tuned_rf_prediction_illustrative_recall_090",
     } <= set(result["predictions"])
+    latency_benchmark = result["latency_benchmark"]
+    assert latency_benchmark == {
+        "batch_rows": len(x_train),
+        "repeats": 5,
+        "source": "training_feature_batch",
+    }
     tradeoff = result["threshold_tradeoff"]
     assert tradeoff["target"].tolist() == y_train.tolist()
     assert len(tradeoff["scores"]) == len(y_train)
