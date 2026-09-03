@@ -10,8 +10,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
-    make_scorer,
     precision_score,
+    precision_recall_curve,
     recall_score,
     roc_auc_score,
 )
@@ -29,7 +29,7 @@ from credit_risk.preprocessing import build_preprocessor
 
 
 DEFAULT_THRESHOLD = 0.5
-MINIMUM_OPERATING_RECALL = 0.9
+RECALL_FLOORS = [0.80, 0.85, 0.90, 0.95]
 
 
 def rule_based_predict(row: pd.Series) -> int:
@@ -56,6 +56,7 @@ def evaluate_classifier(
     prediction_latency_ms: float,
 ) -> dict[str, float]:
     """Calculate classification metrics on an untouched test target."""
+    y_values = np.asarray(y_true)
     return {
         "accuracy": float(accuracy_score(y_true, predictions)),
         "precision": float(
@@ -65,6 +66,8 @@ def evaluate_classifier(
         "f1": float(f1_score(y_true, predictions, zero_division=0)),
         "roc_auc": float(roc_auc_score(y_true, scores)),
         "prediction_latency_ms": float(prediction_latency_ms),
+        "fn": int(np.sum((y_values == 1) & (predictions == 0))),
+        "fp": int(np.sum((y_values == 0) & (predictions == 1))),
     }
 
 
@@ -112,12 +115,25 @@ def _tune_threshold(
     return float(tuner.best_threshold_)
 
 
-def _precision_at_minimum_recall(y_true, predictions) -> float:
-    """Score a threshold by precision only when it reaches required recall."""
-    recall = recall_score(y_true, predictions, zero_division=0)
-    if recall < MINIMUM_OPERATING_RECALL:
-        return -1.0
-    return float(precision_score(y_true, predictions, zero_division=0))
+def _select_recall_scenarios(
+    y_train: pd.Series,
+    oof_scores: np.ndarray,
+) -> dict[str, dict[str, float | str]]:
+    """Select maximum-precision thresholds at recall floors from Train OOF scores."""
+    precision, recall, thresholds = precision_recall_curve(y_train, oof_scores)
+    scenarios = {}
+    for floor in RECALL_FLOORS:
+        candidates = np.flatnonzero(recall[:-1] >= floor)
+        best_precision = precision[candidates].max()
+        best_threshold = thresholds[
+            candidates[precision[candidates] == best_precision]
+        ].max()
+        scenarios[f"{floor:.2f}"] = {
+            "threshold": float(best_threshold),
+            "cv_recall_floor": float(floor),
+            "selection_policy": "maximize_precision_at_recall_floor",
+        }
+    return scenarios
 
 
 def train_classification(
@@ -202,19 +218,22 @@ def train_classification(
         n_jobs=-1,
     )
 
-    f1_scorer = "f1"
-    operating_scorer = make_scorer(_precision_at_minimum_recall)
     logistic_f1_threshold = _tune_threshold(
-        logistic, x_train, y_train, cv, f1_scorer
-    )
-    logistic_threshold = _tune_threshold(
-        logistic, x_train, y_train, cv, operating_scorer
+        logistic, x_train, y_train, cv, "f1"
     )
     tuned_forest_f1_threshold = _tune_threshold(
-        tuned_forest, x_train, y_train, cv, f1_scorer
+        tuned_forest, x_train, y_train, cv, "f1"
     )
-    tuned_forest_threshold = _tune_threshold(
-        tuned_forest, x_train, y_train, cv, operating_scorer
+    logistic_oof_scores = cross_val_predict(
+        logistic,
+        x_train,
+        y_train,
+        cv=cv,
+        method="predict_proba",
+        n_jobs=-1,
+    )[:, 1]
+    logistic_recall_scenarios = _select_recall_scenarios(
+        y_train, logistic_oof_scores
     )
     tuned_forest_oof_scores = cross_val_predict(
         tuned_forest,
@@ -224,6 +243,9 @@ def train_classification(
         method="predict_proba",
         n_jobs=-1,
     )[:, 1]
+    tuned_forest_recall_scenarios = _select_recall_scenarios(
+        y_train, tuned_forest_oof_scores
+    )
 
     rule_predictions = x_test.apply(rule_based_predict, axis=1).to_numpy()
     logistic_scores = logistic.predict_proba(x_test)[:, 1]
@@ -232,10 +254,12 @@ def train_classification(
     logistic_predictions = (logistic_scores >= DEFAULT_THRESHOLD).astype(int)
     forest_predictions = (forest_scores >= DEFAULT_THRESHOLD).astype(int)
     tuned_predictions = (tuned_scores >= DEFAULT_THRESHOLD).astype(int)
-    logistic_tuned_predictions = (logistic_scores >= logistic_threshold).astype(int)
+    logistic_tuned_predictions = (
+        logistic_scores >= logistic_recall_scenarios["0.90"]["threshold"]
+    ).astype(int)
     logistic_f1_predictions = (logistic_scores >= logistic_f1_threshold).astype(int)
     tuned_forest_tuned_predictions = (
-        tuned_scores >= tuned_forest_threshold
+        tuned_scores >= tuned_forest_recall_scenarios["0.90"]["threshold"]
     ).astype(int)
     tuned_forest_f1_predictions = (
         tuned_scores >= tuned_forest_f1_threshold
@@ -274,57 +298,55 @@ def train_classification(
         )
         for name in predictions
     }
+    def build_threshold_analysis(
+        default_predictions: np.ndarray,
+        model_scores: np.ndarray,
+        f1_threshold: float,
+        f1_predictions: np.ndarray,
+        recall_scenarios: dict[str, dict[str, float | str]],
+        latency: float,
+    ) -> dict:
+        scenarios = {}
+        for floor, scenario in recall_scenarios.items():
+            threshold = float(scenario["threshold"])
+            scenario_predictions = (model_scores >= threshold).astype(int)
+            scenarios[floor] = {
+                **scenario,
+                "test_metrics": evaluate_classifier(
+                    y_test, scenario_predictions, model_scores, latency
+                ),
+            }
+        return {
+            "default_threshold": DEFAULT_THRESHOLD,
+            "default_metrics": evaluate_classifier(
+                y_test, default_predictions, model_scores, latency
+            ),
+            "f1_reference": {
+                "threshold": f1_threshold,
+                "metrics": evaluate_classifier(
+                    y_test, f1_predictions, model_scores, latency
+                ),
+            },
+            "recall_scenarios": scenarios,
+        }
+
     threshold_analysis = {
-        "Logistic Regression": {
-            "default_threshold": DEFAULT_THRESHOLD,
-            "optimized_threshold": logistic_threshold,
-            "minimum_recall": MINIMUM_OPERATING_RECALL,
-            "selection_policy": "maximize_precision_at_minimum_recall",
-            "default_metrics": evaluate_classifier(
-                y_test,
-                logistic_predictions,
-                logistic_scores,
-                latencies["Logistic Regression"],
-            ),
-            "optimized_metrics": evaluate_classifier(
-                y_test,
-                logistic_tuned_predictions,
-                logistic_scores,
-                latencies["Logistic Regression"],
-            ),
-            "f1_optimized_threshold": logistic_f1_threshold,
-            "f1_optimized_metrics": evaluate_classifier(
-                y_test,
-                logistic_f1_predictions,
-                logistic_scores,
-                latencies["Logistic Regression"],
-            ),
-        },
-        "Random Forest (Tuned)": {
-            "default_threshold": DEFAULT_THRESHOLD,
-            "optimized_threshold": tuned_forest_threshold,
-            "minimum_recall": MINIMUM_OPERATING_RECALL,
-            "selection_policy": "maximize_precision_at_minimum_recall",
-            "default_metrics": evaluate_classifier(
-                y_test,
-                tuned_predictions,
-                tuned_scores,
-                latencies["Random Forest (Tuned)"],
-            ),
-            "optimized_metrics": evaluate_classifier(
-                y_test,
-                tuned_forest_tuned_predictions,
-                tuned_scores,
-                latencies["Random Forest (Tuned)"],
-            ),
-            "f1_optimized_threshold": tuned_forest_f1_threshold,
-            "f1_optimized_metrics": evaluate_classifier(
-                y_test,
-                tuned_forest_f1_predictions,
-                tuned_scores,
-                latencies["Random Forest (Tuned)"],
-            ),
-        },
+        "Logistic Regression": build_threshold_analysis(
+            logistic_predictions,
+            logistic_scores,
+            logistic_f1_threshold,
+            logistic_f1_predictions,
+            logistic_recall_scenarios,
+            latencies["Logistic Regression"],
+        ),
+        "Random Forest (Tuned)": build_threshold_analysis(
+            tuned_predictions,
+            tuned_scores,
+            tuned_forest_f1_threshold,
+            tuned_forest_f1_predictions,
+            tuned_forest_recall_scenarios,
+            latencies["Random Forest (Tuned)"],
+        ),
     }
     prediction_table = pd.DataFrame(
         {

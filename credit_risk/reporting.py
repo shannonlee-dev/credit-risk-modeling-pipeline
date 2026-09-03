@@ -52,24 +52,25 @@ def _save_confusion_matrices(
 
 
 def _save_threshold_tradeoff(
-    y_test: pd.Series,
+    y_train: np.ndarray,
     scores: np.ndarray,
     default_threshold: float,
-    optimized_threshold: float,
+    f1_threshold: float,
+    recall_scenarios: dict[str, dict],
     output_path: Path,
 ) -> None:
     thresholds = np.linspace(0, 1, 101)
     metrics = {
         "Precision": [
-            precision_score(y_test, scores >= threshold, zero_division=0)
+            precision_score(y_train, scores >= threshold, zero_division=0)
             for threshold in thresholds
         ],
         "Recall": [
-            recall_score(y_test, scores >= threshold, zero_division=0)
+            recall_score(y_train, scores >= threshold, zero_division=0)
             for threshold in thresholds
         ],
         "F1": [
-            f1_score(y_test, scores >= threshold, zero_division=0)
+            f1_score(y_train, scores >= threshold, zero_division=0)
             for threshold in thresholds
         ],
     }
@@ -78,11 +79,17 @@ def _save_threshold_tradeoff(
         axis.plot(thresholds, values, label=name)
     axis.axvline(default_threshold, color="black", linestyle="--", label="Default 0.5")
     axis.axvline(
-        optimized_threshold,
-        color="tab:red",
+        f1_threshold,
+        color="tab:purple",
         linestyle="--",
-        label="Recall-constrained threshold",
+        label="F1 reference",
     )
+    for floor, scenario in recall_scenarios.items():
+        axis.axvline(
+            scenario["threshold"],
+            linestyle=":",
+            label=f"Recall ≥ {floor} CV",
+        )
     axis.set_xlabel("Decision threshold")
     axis.set_ylabel("Metric")
     axis.set_title("Tuned Random Forest Threshold Trade-off (Train OOF)")
@@ -172,9 +179,13 @@ def save_classification_artifacts(
         y_test,
         {
             "Logistic (0.5)": table["logistic_prediction_default"].to_numpy(),
-            "Logistic (CV-tuned)": table["logistic_prediction_tuned"].to_numpy(),
+            "Logistic (Recall ≥ 0.90 CV, illustrative)": table[
+                "logistic_prediction_tuned"
+            ].to_numpy(),
             "Tuned RF (0.5)": table["tuned_rf_prediction_default"].to_numpy(),
-            "Tuned RF (CV-tuned)": table["tuned_rf_prediction_tuned"].to_numpy(),
+            "Tuned RF (Recall ≥ 0.90 CV, illustrative)": table[
+                "tuned_rf_prediction_tuned"
+            ].to_numpy(),
         },
         destination / "confusion_matrix_threshold_comparison.png",
     )
@@ -198,7 +209,8 @@ def save_classification_artifacts(
         tradeoff["target"],
         tradeoff["scores"],
         rf_thresholds["default_threshold"],
-        rf_thresholds["optimized_threshold"],
+        rf_thresholds["f1_reference"]["threshold"],
+        rf_thresholds["recall_scenarios"],
         destination / "threshold_tradeoff.png",
     )
     table.to_csv(destination / "classification_predictions.csv", index=False)

@@ -94,7 +94,7 @@ python -m pytest -v
 
 Logistic Regression은 규칙 기반보다 F1-Score가 약 33.3%, ROC-AUC가 약 17.4% 향상되었습니다. Accuracy만 보면 기본 Random Forest가 가장 높지만 연체 Recall이 0.5250으로 낮아, 연체 고객을 정상으로 놓치는 비용이 큰 신용 심사에는 부적합합니다.
 
-튜닝된 Random Forest의 최적값은 `max_depth=8`, `min_samples_split=5`, `n_estimators=200`이며 Train 내부 CV ROC-AUC는 0.9468입니다. GridSearchCV는 risk score의 순위 구분 능력(ROC-AUC)으로 모델을 고르고, 운영 임계값은 별도 Train 내부 CV에서 Recall 90% 이상을 만족하는 범위에서 Precision을 최대화해 선택합니다.
+튜닝된 Random Forest의 최적값은 `max_depth=8`, `min_samples_split=5`, `n_estimators=200`이며 Train 내부 CV ROC-AUC는 0.9468입니다. GridSearchCV는 risk score의 순위 구분 능력(ROC-AUC)으로 모델을 고르고, 운영 정책은 별도 Train 내부 CV에서 여러 Recall floor의 trade-off를 비교합니다.
 
 ![Confusion Matrix](artifacts/confusion_matrix.png)
 
@@ -138,39 +138,37 @@ Random Forest는 `n_estimators`(100, 200), `max_depth`(None, 8, 16), `min_sample
 
 ## Decision Threshold
 
-모든 ML 모델은 기본 정책 `threshold=0.5`를 유지합니다. F1 최대 threshold는 참고값으로 보고하며, 최종 운영 threshold는 같은 Train Set 내부 CV에서 Recall 90% 이상을 만족하는 후보 중 Precision이 가장 높은 값으로 선택합니다. Test Set은 임계값이나 hyperparameter 선택에 전혀 사용하지 않고, 선택이 끝난 정책의 일반화 성능을 한 번 평가하는 데만 사용합니다. ROC-AUC는 연속 score로 계산하므로 threshold가 바뀌어도 동일합니다.
+모든 ML 모델은 기본 정책 `threshold=0.5`를 유지합니다. F1 최대 threshold는 비교/reference이고 운영 기준이 아닙니다. `0.80`, `0.85`, `0.90`, `0.95` Recall floor별 threshold는 같은 Train Set의 5-fold out-of-fold score에서만 선택합니다. 각 floor에서 `Recall >= floor` 후보 중 Precision이 최대인 threshold를 택하며, Test Set은 선택이 끝난 정책의 holdout 성능을 한 번 비교하는 데만 사용합니다. ROC-AUC는 연속 score로 계산하므로 scenario 간 동일합니다.
 
-| Model | Threshold | Precision | Recall | F1 | ROC-AUC |
-|---|---:|---:|---:|---:|---:|
-| Logistic Regression | 0.5000 | 0.4965 | 0.8750 | 0.6335 | 0.9505 |
-| Logistic Regression | 0.7576 (F1 reference) | **0.6310** | 0.7625 | **0.6906** | **0.9505** |
-| Logistic Regression | 0.4848 (Recall ≥ 0.90 CV) | 0.4919 | 0.8833 | 0.6319 | 0.9505 |
-| Tuned Random Forest | 0.5000 | 0.5102 | **0.8333** | 0.6329 | 0.9409 |
-| Tuned Random Forest | 0.5186 (F1 reference) | 0.5197 | 0.8250 | 0.6377 | 0.9409 |
-| Tuned Random Forest | 0.3523 (Recall ≥ 0.90 CV) | 0.4563 | **0.8917** | 0.6037 | 0.9409 |
+| Model | Policy / Recall floor | Selected threshold | Precision | Recall | F1 | FN | FP | ROC-AUC |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| Logistic Regression | Default 0.5 | 0.5000 | 0.4965 | 0.8750 | 0.6335 | 30 | 213 | 0.9505 |
+| Logistic Regression | F1 reference | 0.7576 | **0.6310** | 0.7625 | **0.6906** | 57 | 107 | 0.9505 |
+| Logistic Regression | Recall ≥ 0.80 CV | 0.7162 | 0.6084 | 0.7833 | 0.6849 | 52 | 121 | 0.9505 |
+| Logistic Regression | Recall ≥ 0.85 CV | 0.6460 | 0.5723 | 0.8083 | 0.6701 | 46 | 145 | 0.9505 |
+| Logistic Regression | Recall ≥ 0.90 CV | 0.5366 | 0.5123 | 0.8708 | 0.6451 | 31 | 199 | 0.9505 |
+| Logistic Regression | Recall ≥ 0.95 CV | 0.3634 | 0.4286 | 0.9375 | 0.5882 | 15 | 300 | 0.9505 |
+| Tuned Random Forest | Default 0.5 | 0.5000 | 0.5102 | 0.8333 | 0.6329 | 40 | 192 | 0.9409 |
+| Tuned Random Forest | F1 reference | 0.5186 | 0.5197 | 0.8250 | 0.6377 | 42 | 183 | 0.9409 |
+| Tuned Random Forest | Recall ≥ 0.80 CV | 0.5772 | 0.5595 | 0.7833 | 0.6528 | 52 | 148 | 0.9409 |
+| Tuned Random Forest | Recall ≥ 0.85 CV | 0.5166 | 0.5196 | 0.8292 | 0.6388 | 41 | 184 | 0.9409 |
+| Tuned Random Forest | Recall ≥ 0.90 CV | 0.4134 | 0.4780 | 0.8583 | 0.6140 | 34 | 225 | 0.9409 |
+| Tuned Random Forest | Recall ≥ 0.95 CV | 0.2577 | 0.3969 | **0.9458** | 0.5591 | 13 | 345 | 0.9409 |
 
-Logistic Regression의 Test Set 오류 건수는 F1만으로 운영 threshold를 정하면 왜 위험해질 수 있는지 보여줍니다.
-
-| Logistic policy | FN (위험 고객 누락) | FP (정상 고객 추가 심사) |
-|---|---:|---:|
-| Default 0.5 | 30 | 213 |
-| F1 reference | 57 | 107 |
-| Recall ≥ 0.90 CV | 28 | 219 |
-
-F1-optimal은 F1을 0.6335에서 0.6906으로 높였지만 FN도 30건에서 57건으로 거의 두 배가 됩니다. 신용리스크 screening에서는 이 미탐 증가가 업무 목적과 맞지 않을 수 있으므로, F1 결과는 정책 선택의 참고값으로만 사용합니다. 최종 운영 후보는 Recall 제약을 먼저 적용해 FN을 28건으로 제한하고, 그 범위에서 Precision이 가장 높은 Logistic Regression threshold를 사용합니다. 그 대가로 정상 고객 추가 심사(FP)는 기본값보다 6건 늘어납니다.
+Recall floor가 높아질수록 위험 고객 누락(FN)은 일반적으로 줄고, 정상 고객을 위험으로 분류해 추가 심사하는 FP는 증가할 수 있습니다. 이는 모델 성능의 우열이 아니라 운영 정책의 trade-off입니다. 실제 손실비용, risk appetite, 승인정책, 심사 capacity가 없으므로 특정 90%를 정답이나 최적 운영 threshold로 취급하지 않습니다. 본 프로젝트는 80%·85%·90%·95%의 sensitivity scenario를 비교하며, 실제 기준은 그 경제적·운영적 정보를 바탕으로 금융기관이 정해야 합니다.
 
 ![Threshold comparison confusion matrices](artifacts/confusion_matrix_threshold_comparison.png)
 
 ![Tuned Random Forest threshold trade-off](artifacts/threshold_tradeoff.png)
 
-`threshold_tradeoff.png`는 Test Set을 훑지 않습니다. Tuned Random Forest의 Train Set 5-fold out-of-fold risk score로 Precision, Recall, F1의 threshold별 변화를 그리며, Test Set은 위 표의 최종 정책 평가에만 사용합니다.
+`threshold_tradeoff.png`는 Test Set을 훑지 않습니다. Tuned Random Forest의 Train Set 5-fold out-of-fold risk score로 Precision, Recall, F1의 threshold별 변화를 그리고, F1 reference 및 네 Recall floor에서 선택된 threshold를 표시합니다. Test Set은 위 표의 holdout 정책 비교에만 사용합니다.
 
 ## FP / FN Interpretation
 
 - False Positive: 실제 정상 고객을 고위험으로 분류하는 오류입니다. 불필요한 추가 심사, 승인 지연, 우량 고객 이탈 또는 영업 기회비용으로 이어질 수 있습니다.
 - False Negative: 실제 연체 고객을 정상으로 분류하는 오류입니다. 위험 대출 승인과 연체·신용손실 증가 가능성을 높입니다.
 
-실제 금융기관은 두 오류의 경제적 비용, risk appetite, 심사 인력, 정책을 함께 반영해 임계값을 정합니다. 이 데이터에는 실제 손실액이 없으므로 `FN cost = 5 × FP cost` 같은 임의 금전 가정은 하지 않았습니다. 대신 위험고객 누락을 제한하기 위해 Train Set 내부 CV의 Recall 90% 제약을 먼저 적용하고, 그 안에서 Precision이 가장 높은 threshold를 운영 정책으로 선택했습니다.
+실제 금융기관은 두 오류의 경제적 비용, risk appetite, 심사 인력, 승인정책을 함께 반영해 적정 Recall floor를 정합니다. 이 데이터에는 실제 손실액과 capacity 정보가 없으므로 `FN cost = 5 × FP cost` 같은 임의 금전 가정이나 특정 Recall floor의 최적 주장을 하지 않았습니다.
 
 ### 앙상블과 편향·분산
 
@@ -212,7 +210,7 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 
 ## 운영 모델과 임계값
 
-최종 운영 후보는 Recall-constrained Logistic Regression입니다. Tuned RF보다 운영 정책 F1(0.6319 vs. 0.6037)과 ROC-AUC(0.9505 vs. 0.9409)가 높고, Test batch prediction latency도 8.1103ms로 66.4681ms보다 훨씬 낮습니다. 선형 모델은 구조와 설명도 더 단순합니다. Holdout Test의 Recall은 각각 0.8833과 0.8917로 CV의 90% 제약과 차이가 날 수 있으므로, 실제 운영 전에는 독립 검증 기간에서도 이 기준을 재확인해야 합니다.
+이 데이터만으로 최종 운영 Recall floor를 정하지 않습니다. Logistic Regression은 모든 표기 scenario에서 Tuned RF보다 ROC-AUC가 높고 예측 지연시간도 낮지만, 어떤 FN/FP 조합을 수용할지는 경제적 비용과 risk appetite가 있어야 판단할 수 있습니다. 포트폴리오에서 하나를 보여줘야 한다면 `Recall ≥ 0.90 CV`를 illustrative operating scenario라고만 표시할 수 있습니다. Holdout Recall은 CV floor와 정확히 같을 필요가 없으므로 실제 운영 전에는 독립 검증 기간에서도 재확인해야 합니다.
 
 ## 산출물
 
