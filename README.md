@@ -1,5 +1,7 @@
 # 신용 위험 모델링 파이프라인
 
+[![Tests](https://github.com/shannonlee-dev/credit-risk-modeling-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/shannonlee-dev/credit-risk-modeling-pipeline/actions/workflows/tests.yml)
+
 10,000건의 재현 가능한 가상 금융 데이터를 사용해, 규칙 기반 분류와 로지스틱 회귀·랜덤 포레스트, 그리고 리지·라쏘 회귀를 비교하는 지도학습 포트폴리오 프로젝트입니다.
 
 ## 범위
@@ -37,6 +39,8 @@ uv run python -m pytest -v
 | Random Forest (Tuned, threshold 0.33) | 0.8365 | 0.5725 | 0.9405 |
 
 상세 CV·threshold·hyperparameter 결과는 [model_selection.md](docs/model_selection.md)와 [metrics.json](artifacts/metrics.json)을 참조합니다.
+
+- [Generative structure analysis](docs/generative_analysis.md) — synthetic data의 실제 생성식을 모델이 얼마나 복원했는지 분석
 
 규칙 기반 기준선보다 로지스틱 회귀는 F1을 `0.4752 → 0.6013`, ROC-AUC를 `0.8096 → 0.9505`로 높였습니다. 비슷한 OOF Recall 조건으로 맞춘 선택 threshold에서는 Logistic이 Tuned RF보다 Precision과 F1이 높아 최종 분류 모델로 선택했습니다.
 
@@ -86,6 +90,7 @@ credit_risk/
   reporting.py                 # JSON, CSV, 그래프 저장
   workflow.py                  # 실행 흐름 조립
 docs/model_selection.md        # 방법론과 실험 선택 근거
+docs/generative_analysis.md    # synthetic data 생성식 복원 분석
 artifacts/                     # 커밋된 지표 기록과 설명용 그래프
 tests/                         # 동작 중심 회귀 테스트
 ```
