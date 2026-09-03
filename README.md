@@ -4,6 +4,10 @@
 
 10,000건의 가상 금융 데이터를 직접 생성하고, 규칙 기반 베이스라인과 머신러닝 모델을 정량적으로 비교하는 지도학습 프로젝트입니다. 동일한 여섯 고객 특성으로 연체 위험을 분류하고 신용 점수를 회귀 예측하며, 데이터 누수 방지·불균형 처리·L1/L2 규제·앙상블 튜닝의 효과를 재현 가능한 실행 흐름으로 확인합니다.
 
+## Project Scope
+
+이 파이프라인은 연체 위험을 추정하여 대출 심사 의사결정을 지원하는 risk screening model입니다. 고위험 신청자의 추가 심사 우선순위를 지원할 수 있지만, 실제 고객을 자동 승인·거절하지 않으며 최종 결정은 정책과 추가 정보에 결합됩니다.
+
 ## 핵심 특징
 
 - 여섯 조건의 규칙 기반 모델과 Logistic Regression, Random Forest 비교
@@ -64,7 +68,7 @@ python -m pytest -v
 
 `finance_data.csv`와 예측 CSV는 `.gitignore`의 `*.csv` 규칙으로 저장소에서 제외됩니다. 전체 실행 결과는 `artifacts/`에 생성됩니다.
 
-## 데이터와 분할
+## Data & Targets
 
 입력 특성은 `age`, `annual_income`, `spending_score`, `debt_ratio`, `credit_card_count`, `overdue_count_6m`입니다. 제공된 생성 코드의 수식과 노이즈를 변경하지 않았습니다.
 
@@ -76,18 +80,21 @@ python -m pytest -v
 
 분류는 `test_size=0.2`, `stratify=y`, `random_state=42`로 분할하여 Train/Test의 연체 비율을 보존했습니다. 회귀도 동일한 8:2 비율과 시드를 사용합니다.
 
-## 분류 성능
+- Regression target: `credit_score`
+- Classification target: `is_overdue`
+
+## Class Imbalance & Classification Performance
 
 | 모델 | Accuracy | Precision | Recall | F1-Score | ROC-AUC | 예측 지연시간(ms) |
 |---|---:|---:|---:|---:|---:|---:|
-| 규칙 기반 | 0.7725 | 0.3285 | 0.8583 | 0.4752 | 0.8096 | 13.5275 |
-| Logistic Regression | 0.8785 | 0.4965 | **0.8750** | **0.6335** | **0.9505** | **1.7027** |
-| Random Forest | **0.9095** | **0.6528** | 0.5250 | 0.5820 | 0.9376 | 36.8787 |
-| Random Forest (튜닝) | 0.8840 | 0.5102 | 0.8333 | 0.6329 | 0.9409 | 59.7413 |
+| 규칙 기반 | 0.7725 | 0.3285 | 0.8583 | 0.4752 | 0.8096 | 14.3352 |
+| Logistic Regression | 0.8785 | 0.4965 | **0.8750** | **0.6335** | **0.9505** | **2.7185** |
+| Random Forest | **0.9095** | **0.6528** | 0.5250 | 0.5820 | 0.9376 | 44.4808 |
+| Random Forest (튜닝) | 0.8840 | 0.5102 | 0.8333 | 0.6329 | 0.9409 | 56.2024 |
 
 Logistic Regression은 규칙 기반보다 F1-Score가 약 33.3%, ROC-AUC가 약 17.4% 향상되었습니다. Accuracy만 보면 기본 Random Forest가 가장 높지만 연체 Recall이 0.5250으로 낮아, 연체 고객을 정상으로 놓치는 비용이 큰 신용 심사에는 부적합합니다.
 
-튜닝된 Random Forest의 최적값은 `max_depth=8`, `min_samples_split=5`, `n_estimators=200`이며 Train 내부 CV F1은 0.6662입니다. 튜닝 후 기본 Forest 대비 F1은 0.5820에서 0.6329로 약 8.8%, Recall은 0.5250에서 0.8333으로 상승했습니다. 대신 오탐 증가로 Accuracy와 Precision은 낮아졌습니다.
+튜닝된 Random Forest의 최적값은 `max_depth=8`, `min_samples_split=5`, `n_estimators=200`이며 Train 내부 CV ROC-AUC는 0.9468입니다. GridSearchCV는 risk score의 순위 구분 능력(ROC-AUC)으로 모델을 고르고, 운영 임계값은 별도 Train 내부 CV에서 Recall 90% 이상을 만족하는 범위에서 Precision을 최대화해 선택합니다.
 
 ![Confusion Matrix](artifacts/confusion_matrix.png)
 
@@ -96,6 +103,8 @@ Logistic Regression은 규칙 기반보다 F1-Score가 약 33.3%, ROC-AUC가 약
 ### 평가지표 선정 근거
 
 전체 양성 비율이 12.01%이므로 Accuracy는 다수 클래스의 영향을 크게 받습니다. 따라서 Accuracy를 단독으로 사용하지 않고, 양성 클래스의 Precision과 Recall을 함께 반영하는 F1-Score와 임계값 전반의 순위 구분 능력을 나타내는 ROC-AUC를 핵심 지표로 사용했습니다.
+
+`class_weight="balanced"`로 학습했으므로 `predict_proba()` 값은 검증된 실제 연체 확률이 아니라 model-estimated overdue probability 또는 risk score로 해석합니다. 확률 보정(calibration)은 이번 범위에 포함하지 않았습니다.
 
 규칙 기반 모델은 여섯 `if` 조건의 최종 0/1 판단만 반환합니다. 이 값으로 AUC 계산은 가능하지만 ROC가 하나의 거친 운영점에 기반하므로, `predict_proba()`가 반환한 연속 위험 확률로 계산한 ML 모델의 AUC와 동일한 수준으로 해석하면 안 됩니다.
 
@@ -122,6 +131,44 @@ SMOTE 대신 Logistic Regression과 Random Forest에 `class_weight="balanced"`�
 | SMOTE | 소수 클래스의 학습 표본을 직접 보강 | 부적절한 합성점·노이즈 증폭 가능, CV 내부 리샘플링 구성이 필요함 |
 
 `class_weight`는 학습 과정의 손실 계산에만 영향을 주며 Test Set 자체의 분포는 변경하지 않습니다. SMOTE를 사용하더라도 Train/CV fold 내부에서만 적용해야 하며, Test Set은 실제 분포를 보존해야 공정한 일반화 성능을 평가할 수 있습니다.
+
+## Hyperparameter Optimization
+
+Random Forest는 `n_estimators`(100, 200), `max_depth`(None, 8, 16), `min_samples_split`(2, 5)의 12개 조합을 `GridSearchCV(scoring="roc_auc")`로 비교합니다. 이 단계는 연속 risk score를 잘 생성하는 모델을 고르는 과정이며, Test Set은 사용하지 않습니다.
+
+## Decision Threshold
+
+모든 ML 모델은 기본 정책 `threshold=0.5`를 유지합니다. F1 최대 threshold는 참고값으로 보고하며, 최종 운영 threshold는 같은 Train Set 내부 CV에서 Recall 90% 이상을 만족하는 후보 중 Precision이 가장 높은 값으로 선택합니다. Test Set은 임계값이나 hyperparameter 선택에 전혀 사용하지 않고, 선택이 끝난 정책의 일반화 성능을 한 번 평가하는 데만 사용합니다. ROC-AUC는 연속 score로 계산하므로 threshold가 바뀌어도 동일합니다.
+
+| Model | Threshold | Precision | Recall | F1 | ROC-AUC |
+|---|---:|---:|---:|---:|---:|
+| Logistic Regression | 0.5000 | 0.4965 | 0.8750 | 0.6335 | 0.9505 |
+| Logistic Regression | 0.7576 (F1 reference) | **0.6310** | 0.7625 | **0.6906** | **0.9505** |
+| Logistic Regression | 0.4848 (Recall ≥ 0.90 CV) | 0.4919 | 0.8833 | 0.6319 | 0.9505 |
+| Tuned Random Forest | 0.5000 | 0.5102 | **0.8333** | 0.6329 | 0.9409 |
+| Tuned Random Forest | 0.5186 (F1 reference) | 0.5197 | 0.8250 | 0.6377 | 0.9409 |
+| Tuned Random Forest | 0.3523 (Recall ≥ 0.90 CV) | 0.4563 | **0.8917** | 0.6037 | 0.9409 |
+
+Logistic Regression의 Test Set 오류 건수는 F1만으로 운영 threshold를 정하면 왜 위험해질 수 있는지 보여줍니다.
+
+| Logistic policy | FN (위험 고객 누락) | FP (정상 고객 추가 심사) |
+|---|---:|---:|
+| Default 0.5 | 30 | 213 |
+| F1 reference | 57 | 107 |
+| Recall ≥ 0.90 CV | 28 | 219 |
+
+F1-optimal은 F1을 0.6335에서 0.6906으로 높였지만 FN도 30건에서 57건으로 거의 두 배가 됩니다. 신용리스크 screening에서는 이 미탐 증가가 업무 목적과 맞지 않을 수 있으므로, F1 결과는 정책 선택의 참고값으로만 사용합니다. 최종 운영 후보는 Recall 제약을 먼저 적용해 FN을 28건으로 제한하고, 그 범위에서 Precision이 가장 높은 Logistic Regression threshold를 사용합니다. 그 대가로 정상 고객 추가 심사(FP)는 기본값보다 6건 늘어납니다.
+
+![Threshold comparison confusion matrices](artifacts/confusion_matrix_threshold_comparison.png)
+
+![Tuned Random Forest threshold trade-off](artifacts/threshold_tradeoff.png)
+
+## FP / FN Interpretation
+
+- False Positive: 실제 정상 고객을 고위험으로 분류하는 오류입니다. 불필요한 추가 심사, 승인 지연, 우량 고객 이탈 또는 영업 기회비용으로 이어질 수 있습니다.
+- False Negative: 실제 연체 고객을 정상으로 분류하는 오류입니다. 위험 대출 승인과 연체·신용손실 증가 가능성을 높입니다.
+
+실제 금융기관은 두 오류의 경제적 비용, risk appetite, 심사 인력, 정책을 함께 반영해 임계값을 정합니다. 이 데이터에는 실제 손실액이 없으므로 `FN cost = 5 × FP cost` 같은 임의 금전 가정은 하지 않았습니다. 대신 위험고객 누락을 제한하기 위해 Train Set 내부 CV의 Recall 90% 제약을 먼저 적용하고, 그 안에서 Precision이 가장 높은 threshold를 운영 정책으로 선택했습니다.
 
 ### 앙상블과 편향·분산
 
@@ -163,9 +210,7 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 
 ## 운영 모델과 임계값
 
-최종 운영 후보로 Logistic Regression을 선택합니다. 튜닝 Forest보다 F1이 0.0006, AUC가 0.0095 높고 이번 환경에서 예측 지연시간도 훨씬 짧았습니다. 지연시간은 실행 환경에 따라 달라질 수 있지만, 현재는 앙상블의 복잡도와 응답 비용을 정당화할 성능 향상이 없습니다.
-
-연체 고객을 정상으로 판단하는 미탐은 원금·이자 손실로 이어질 수 있어 Recall/F1을 우선했습니다. 반대로 정상 고객을 연체로 판단하는 오탐은 승인 기회와 고객 신뢰를 잃게 합니다. 기본 임계값은 0.5이며, 미탐 비용이 더 크면 임계값을 낮춰 Recall을 높이고, 오탐 비용이나 심사 인력 부담이 더 크면 임계값을 높여 Precision을 높일 수 있습니다. 실제 운영에서는 두 오류의 금액 비용을 정의한 후 검증 데이터에서 기대 비용이 최소인 임계값을 선택해야 합니다.
+최종 운영 후보는 Recall-constrained Logistic Regression입니다. Tuned RF보다 운영 정책 F1(0.6319 vs. 0.6037)과 ROC-AUC(0.9505 vs. 0.9409)가 높고, Test batch prediction latency도 2.7185ms로 56.2024ms보다 훨씬 낮습니다. 선형 모델은 구조와 설명도 더 단순합니다. Holdout Test의 Recall은 각각 0.8833과 0.8917로 CV의 90% 제약과 차이가 날 수 있으므로, 실제 운영 전에는 독립 검증 기간에서도 이 기준을 재확인해야 합니다.
 
 ## 산출물
 
@@ -183,12 +228,17 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 | `tests/test_train.py` | 누수 방지, 규칙, 분류·회귀·산출물 검증 |
 | `artifacts/metrics.json` | 클래스 분포, CV, Test 성능, 계수·중요도 기록 |
 | `artifacts/confusion_matrix.png` | Logistic/튜닝 Forest 오분류 비교 |
+| `artifacts/confusion_matrix_threshold_comparison.png` | 기본·CV tuned threshold의 TP/FP/FN/TN 비교 |
 | `artifacts/roc_curve.png` | 규칙·ML 모델 ROC-AUC 비교 |
+| `artifacts/threshold_tradeoff.png` | Tuned Random Forest의 threshold별 Precision/Recall/F1 |
 | `artifacts/feature_importance.png` | 튜닝 Forest 특성 중요도 |
 | `artifacts/regularization_coefficients.png` | Ridge/Lasso Alpha별 계수 변화 |
 
 ## 한계
 
 - 가상 데이터의 생성 규칙을 학습한 결과이므로 실제 고객의 신용 심사에 사용할 수 없습니다.
-- 공정성, 설명 가능성, 확률 보정, 시간에 따른 데이터 드리프트는 이 미션 범위에 포함하지 않았습니다.
+- 실제 대출 손실액이 없어 FP/FN의 금전 비용 기반 임계값을 산출하지 않았습니다.
+- probability calibration을 검증하지 않았습니다.
+- 실제 금융기관의 승인 정책이나 규제 요건을 반영한 production model이 아닙니다.
+- 공정성, 설명 가능성, 시간에 따른 데이터 드리프트는 이 미션 범위에 포함하지 않았습니다.
 - 모델 지연시간은 현재 장비의 2,000건 Test Set 배치 예측 기준이며 온라인 단건 지연시간과 다릅니다.

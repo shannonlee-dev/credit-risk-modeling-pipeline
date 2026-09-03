@@ -14,7 +14,13 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
+from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    RocCurveDisplay,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # noqa: E402
@@ -27,8 +33,10 @@ def _save_confusion_matrices(
     predictions: dict[str, np.ndarray],
     output_path: Path,
 ) -> None:
-    figure, axes = plt.subplots(1, 2, figsize=(10, 4))
-    for axis, (name, values) in zip(axes, predictions.items()):
+    columns = min(2, len(predictions))
+    rows = int(np.ceil(len(predictions) / columns))
+    figure, axes = plt.subplots(rows, columns, figsize=(5 * columns, 4 * rows))
+    for axis, (name, values) in zip(np.asarray(axes).reshape(-1), predictions.items()):
         ConfusionMatrixDisplay.from_predictions(
             y_test,
             values,
@@ -38,6 +46,47 @@ def _save_confusion_matrices(
             ax=axis,
         )
         axis.set_title(name)
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
+def _save_threshold_tradeoff(
+    y_test: pd.Series,
+    scores: np.ndarray,
+    default_threshold: float,
+    optimized_threshold: float,
+    output_path: Path,
+) -> None:
+    thresholds = np.linspace(0, 1, 101)
+    metrics = {
+        "Precision": [
+            precision_score(y_test, scores >= threshold, zero_division=0)
+            for threshold in thresholds
+        ],
+        "Recall": [
+            recall_score(y_test, scores >= threshold, zero_division=0)
+            for threshold in thresholds
+        ],
+        "F1": [
+            f1_score(y_test, scores >= threshold, zero_division=0)
+            for threshold in thresholds
+        ],
+    }
+    figure, axis = plt.subplots(figsize=(8, 5))
+    for name, values in metrics.items():
+        axis.plot(thresholds, values, label=name)
+    axis.axvline(default_threshold, color="black", linestyle="--", label="Default 0.5")
+    axis.axvline(
+        optimized_threshold,
+        color="tab:red",
+        linestyle="--",
+        label="CV-tuned threshold",
+    )
+    axis.set_xlabel("Decision threshold")
+    axis.set_ylabel("Metric")
+    axis.set_title("Tuned Random Forest Threshold Trade-off")
+    axis.legend()
     figure.tight_layout()
     figure.savefig(output_path, dpi=150)
     plt.close(figure)
@@ -111,15 +160,23 @@ def save_classification_artifacts(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     table = result["predictions"]
-    logistic_predictions = (table["logistic_probability"] >= 0.5).astype(int)
-    tuned_predictions = (table["overdue_probability"] >= 0.5).astype(int)
     _save_confusion_matrices(
         y_test,
         {
-            "Logistic Regression": logistic_predictions.to_numpy(),
-            "Random Forest (Tuned)": tuned_predictions.to_numpy(),
+            "Logistic Regression (0.5)": table["logistic_prediction_default"].to_numpy(),
+            "Random Forest (Tuned, 0.5)": table["tuned_rf_prediction_default"].to_numpy(),
         },
         destination / "confusion_matrix.png",
+    )
+    _save_confusion_matrices(
+        y_test,
+        {
+            "Logistic (0.5)": table["logistic_prediction_default"].to_numpy(),
+            "Logistic (CV-tuned)": table["logistic_prediction_tuned"].to_numpy(),
+            "Tuned RF (0.5)": table["tuned_rf_prediction_default"].to_numpy(),
+            "Tuned RF (CV-tuned)": table["tuned_rf_prediction_tuned"].to_numpy(),
+        },
+        destination / "confusion_matrix_threshold_comparison.png",
     )
     _save_roc_curves(
         y_test,
@@ -134,6 +191,14 @@ def save_classification_artifacts(
     _save_feature_importance(
         result["feature_importance"],
         destination / "feature_importance.png",
+    )
+    rf_thresholds = result["threshold_analysis"]["Random Forest (Tuned)"]
+    _save_threshold_tradeoff(
+        y_test,
+        table["overdue_probability"].to_numpy(),
+        rf_thresholds["default_threshold"],
+        rf_thresholds["optimized_threshold"],
+        destination / "threshold_tradeoff.png",
     )
     table.to_csv(destination / "classification_predictions.csv", index=False)
 

@@ -10,15 +10,25 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
+    make_scorer,
     precision_score,
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_validate
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedKFold,
+    TunedThresholdClassifierCV,
+    cross_validate,
+)
 from sklearn.pipeline import Pipeline
 
 from credit_risk.data import RANDOM_STATE
 from credit_risk.preprocessing import build_preprocessor
+
+
+DEFAULT_THRESHOLD = 0.5
+MINIMUM_OPERATING_RECALL = 0.9
 
 
 def rule_based_predict(row: pd.Series) -> int:
@@ -81,6 +91,32 @@ def _feature_importance(model: Pipeline) -> dict[str, float]:
         row.feature: float(row.importance)
         for row in importance.itertuples(index=False)
     }
+
+
+def _tune_threshold(
+    model: Pipeline,
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    cv: StratifiedKFold,
+    scoring: str | object,
+) -> float:
+    """Select an F1-maximizing operating threshold using training CV only."""
+    tuner = TunedThresholdClassifierCV(
+        estimator=clone(model),
+        scoring=scoring,
+        cv=cv,
+        random_state=RANDOM_STATE,
+    )
+    tuner.fit(x_train, y_train)
+    return float(tuner.best_threshold_)
+
+
+def _precision_at_minimum_recall(y_true, predictions) -> float:
+    """Score a threshold by precision only when it reaches required recall."""
+    recall = recall_score(y_true, predictions, zero_division=0)
+    if recall < MINIMUM_OPERATING_RECALL:
+        return -1.0
+    return float(precision_score(y_true, predictions, zero_division=0))
 
 
 def train_classification(
@@ -149,21 +185,52 @@ def train_classification(
     search = GridSearchCV(
         clone(forest),
         parameter_grid,
-        scoring="f1",
+        scoring="roc_auc",
         cv=cv,
         n_jobs=-1,
         refit=True,
     )
     search.fit(x_train, y_train)
     tuned_forest = search.best_estimator_
+    tuned_forest_cv_f1 = cross_validate(
+        tuned_forest,
+        x_train,
+        y_train,
+        scoring="f1",
+        cv=cv,
+        n_jobs=-1,
+    )
+
+    f1_scorer = "f1"
+    operating_scorer = make_scorer(_precision_at_minimum_recall)
+    logistic_f1_threshold = _tune_threshold(
+        logistic, x_train, y_train, cv, f1_scorer
+    )
+    logistic_threshold = _tune_threshold(
+        logistic, x_train, y_train, cv, operating_scorer
+    )
+    tuned_forest_f1_threshold = _tune_threshold(
+        tuned_forest, x_train, y_train, cv, f1_scorer
+    )
+    tuned_forest_threshold = _tune_threshold(
+        tuned_forest, x_train, y_train, cv, operating_scorer
+    )
 
     rule_predictions = x_test.apply(rule_based_predict, axis=1).to_numpy()
     logistic_scores = logistic.predict_proba(x_test)[:, 1]
     forest_scores = forest.predict_proba(x_test)[:, 1]
     tuned_scores = tuned_forest.predict_proba(x_test)[:, 1]
-    logistic_predictions = (logistic_scores >= 0.5).astype(int)
-    forest_predictions = (forest_scores >= 0.5).astype(int)
-    tuned_predictions = (tuned_scores >= 0.5).astype(int)
+    logistic_predictions = (logistic_scores >= DEFAULT_THRESHOLD).astype(int)
+    forest_predictions = (forest_scores >= DEFAULT_THRESHOLD).astype(int)
+    tuned_predictions = (tuned_scores >= DEFAULT_THRESHOLD).astype(int)
+    logistic_tuned_predictions = (logistic_scores >= logistic_threshold).astype(int)
+    logistic_f1_predictions = (logistic_scores >= logistic_f1_threshold).astype(int)
+    tuned_forest_tuned_predictions = (
+        tuned_scores >= tuned_forest_threshold
+    ).astype(int)
+    tuned_forest_f1_predictions = (
+        tuned_scores >= tuned_forest_f1_threshold
+    ).astype(int)
 
     latencies = {
         "Rule Baseline": _average_latency_ms(
@@ -198,13 +265,69 @@ def train_classification(
         )
         for name in predictions
     }
+    threshold_analysis = {
+        "Logistic Regression": {
+            "default_threshold": DEFAULT_THRESHOLD,
+            "optimized_threshold": logistic_threshold,
+            "minimum_recall": MINIMUM_OPERATING_RECALL,
+            "selection_policy": "maximize_precision_at_minimum_recall",
+            "default_metrics": evaluate_classifier(
+                y_test,
+                logistic_predictions,
+                logistic_scores,
+                latencies["Logistic Regression"],
+            ),
+            "optimized_metrics": evaluate_classifier(
+                y_test,
+                logistic_tuned_predictions,
+                logistic_scores,
+                latencies["Logistic Regression"],
+            ),
+            "f1_optimized_threshold": logistic_f1_threshold,
+            "f1_optimized_metrics": evaluate_classifier(
+                y_test,
+                logistic_f1_predictions,
+                logistic_scores,
+                latencies["Logistic Regression"],
+            ),
+        },
+        "Random Forest (Tuned)": {
+            "default_threshold": DEFAULT_THRESHOLD,
+            "optimized_threshold": tuned_forest_threshold,
+            "minimum_recall": MINIMUM_OPERATING_RECALL,
+            "selection_policy": "maximize_precision_at_minimum_recall",
+            "default_metrics": evaluate_classifier(
+                y_test,
+                tuned_predictions,
+                tuned_scores,
+                latencies["Random Forest (Tuned)"],
+            ),
+            "optimized_metrics": evaluate_classifier(
+                y_test,
+                tuned_forest_tuned_predictions,
+                tuned_scores,
+                latencies["Random Forest (Tuned)"],
+            ),
+            "f1_optimized_threshold": tuned_forest_f1_threshold,
+            "f1_optimized_metrics": evaluate_classifier(
+                y_test,
+                tuned_forest_f1_predictions,
+                tuned_scores,
+                latencies["Random Forest (Tuned)"],
+            ),
+        },
+    }
     prediction_table = pd.DataFrame(
         {
             "actual_is_overdue": y_test.to_numpy(),
             "rule_prediction": rule_predictions,
             "logistic_probability": logistic_scores,
+            "logistic_prediction_default": logistic_predictions,
+            "logistic_prediction_tuned": logistic_tuned_predictions,
             "random_forest_probability": forest_scores,
             "overdue_probability": tuned_scores,
+            "tuned_rf_prediction_default": tuned_predictions,
+            "tuned_rf_prediction_tuned": tuned_forest_tuned_predictions,
         }
     )
     return {
@@ -214,7 +337,9 @@ def train_classification(
             "roc_auc_mean": float(cv_scores["test_roc_auc"].mean()),
         },
         "best_params": search.best_params_,
-        "best_cv_f1": float(search.best_score_),
+        "best_cv_roc_auc": float(search.best_score_),
+        "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),
         "feature_importance": _feature_importance(tuned_forest),
+        "threshold_analysis": threshold_analysis,
         "predictions": prediction_table,
     }

@@ -167,11 +167,40 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "model__n_estimators": 20,
     }
     assert result["predictions"]["overdue_probability"].between(0, 1).all()
+    assert set(result["threshold_analysis"]) == {
+        "Logistic Regression",
+        "Random Forest (Tuned)",
+    }
+    for analysis in result["threshold_analysis"].values():
+        assert analysis["default_threshold"] == 0.5
+        assert 0 <= analysis["optimized_threshold"] <= 1
+        assert analysis["minimum_recall"] == 0.9
+        assert 0 <= analysis["f1_optimized_threshold"] <= 1
+        assert {
+            "accuracy",
+            "precision",
+            "recall",
+            "f1",
+            "roc_auc",
+        } <= analysis["default_metrics"].keys()
+        assert analysis["selection_policy"] == "maximize_precision_at_minimum_recall"
+        assert analysis["f1_optimized_metrics"]["f1"] >= 0
+        assert analysis["default_metrics"]["roc_auc"] == pytest.approx(
+            analysis["optimized_metrics"]["roc_auc"]
+        )
+    assert {
+        "logistic_prediction_default",
+        "logistic_prediction_tuned",
+        "tuned_rf_prediction_default",
+        "tuned_rf_prediction_tuned",
+    } <= set(result["predictions"])
     assert (output_dir / "classification_predictions.csv").is_file()
     for name in [
         "confusion_matrix.png",
+        "confusion_matrix_threshold_comparison.png",
         "roc_curve.png",
         "feature_importance.png",
+        "threshold_tradeoff.png",
     ]:
         assert (output_dir / name).stat().st_size > 0
 
@@ -220,6 +249,7 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     report = json.loads((output_dir / "metrics.json").read_text(encoding="utf-8"))
     assert "predictions" not in report["classification"]
     assert "predictions" not in report["regression"]
+    assert "threshold_analysis" in report["classification"]
     assert (output_dir / "classification_predictions.csv").is_file()
     assert (output_dir / "credit_score_predictions.csv").is_file()
 
