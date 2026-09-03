@@ -166,6 +166,41 @@ def _save_random_forest_saturation_curve(
     plt.close(figure)
 
 
+def _save_logistic_c_curve(
+    analysis: dict[str, dict[str, float]],
+    selected_c: float,
+    output_path: Path,
+) -> None:
+    """Plot Train-CV ROC-AUC across logistic regularization candidates."""
+    values = sorted((float(c_value), metrics) for c_value, metrics in analysis.items())
+    c_values = [value for value, _ in values]
+    means = [metrics["cv_roc_auc_mean"] for _, metrics in values]
+    stds = [metrics["cv_roc_auc_std"] for _, metrics in values]
+    figure, axis = plt.subplots(figsize=(8, 5))
+    axis.plot(c_values, means, marker="o", label="CV ROC-AUC mean")
+    axis.fill_between(
+        c_values,
+        np.asarray(means) - np.asarray(stds),
+        np.asarray(means) + np.asarray(stds),
+        alpha=0.2,
+        label="±1 CV standard deviation",
+    )
+    axis.axvline(
+        selected_c,
+        color="tab:orange",
+        linestyle="--",
+        label=f"Selected C: {selected_c:g}",
+    )
+    axis.set_xscale("log")
+    axis.set_xlabel("Regularization inverse strength (C)")
+    axis.set_ylabel("CV ROC-AUC")
+    axis.set_title("Logistic Regression C Selection (Train CV)")
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
 def _save_coefficient_paths(
     coefficients: dict[str, dict[str, dict[str, float]]],
     output_path: Path,
@@ -240,6 +275,11 @@ def save_classification_artifacts(
         result["random_forest_saturation"],
         result["best_params"]["model__n_estimators"],
         destination / "random_forest_n_estimators_curve.png",
+    )
+    _save_logistic_c_curve(
+        result["logistic_c_analysis"],
+        result["selected_logistic_c"],
+        destination / "logistic_c_curve.png",
     )
     rf_thresholds = result["threshold_analysis"]["Random Forest (Tuned)"]
     tradeoff = result["threshold_tradeoff"]

@@ -30,8 +30,15 @@ from credit_risk.preprocessing import build_preprocessor
 
 DEFAULT_THRESHOLD = 0.5
 RECALL_FLOORS = [0.80, 0.85, 0.90, 0.95]
+LOGISTIC_C_VALUES = [0.01, 0.1, 1.0, 10.0, 100.0]
 N_ESTIMATOR_VALUES = [25, 50, 100, 200, 300, 500]
-FAST_N_ESTIMATOR_VALUES = [10, 20, 40, 60, 80]
+RF_MAX_DEPTH_VALUES = [6, 8, 10, 12, None]
+RF_MIN_SAMPLES_SPLIT_VALUES = [2, 5, 10, 20]
+RF_LOCAL_REFINEMENT_GRID = {
+    "model__n_estimators": [200],
+    "model__max_depth": RF_MAX_DEPTH_VALUES,
+    "model__min_samples_split": RF_MIN_SAMPLES_SPLIT_VALUES,
+}
 
 
 def rule_based_predict(row: pd.Series) -> int:
@@ -145,16 +152,14 @@ def _random_forest_saturation_analysis(
     cv: StratifiedKFold,
     best_params: dict[str, object],
     latency_batch: pd.DataFrame,
-    fast: bool,
 ) -> dict[str, dict[str, float]]:
     """Measure tree-count sensitivity with the selected non-tree settings."""
-    values = FAST_N_ESTIMATOR_VALUES if fast else N_ESTIMATOR_VALUES
     fixed_params = {
         "model__max_depth": best_params["model__max_depth"],
         "model__min_samples_split": best_params["model__min_samples_split"],
     }
     saturation = {}
-    for n_estimators in values:
+    for n_estimators in N_ESTIMATOR_VALUES:
         candidate = clone(forest).set_params(
             **fixed_params,
             model__n_estimators=n_estimators,
@@ -178,6 +183,35 @@ def _random_forest_saturation_analysis(
             ),
         }
     return saturation
+
+
+def _analyze_logistic_c_values(
+    logistic: Pipeline,
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    cv: StratifiedKFold,
+) -> tuple[dict[str, dict[str, float]], float]:
+    """Select logistic regularization using Train CV ROC-AUC only."""
+    analysis = {}
+    for c_value in LOGISTIC_C_VALUES:
+        scores = cross_validate(
+            clone(logistic).set_params(model__C=c_value),
+            x_train,
+            y_train,
+            scoring={"roc_auc": "roc_auc", "f1": "f1"},
+            cv=cv,
+            n_jobs=-1,
+        )
+        analysis[str(c_value)] = {
+            "cv_roc_auc_mean": float(scores["test_roc_auc"].mean()),
+            "cv_roc_auc_std": float(scores["test_roc_auc"].std()),
+            "cv_f1_mean": float(scores["test_f1"].mean()),
+        }
+    selected_c = min(
+        LOGISTIC_C_VALUES,
+        key=lambda c_value: (-analysis[str(c_value)]["cv_roc_auc_mean"], c_value),
+    )
+    return analysis, selected_c
 
 
 def train_classification(
@@ -218,31 +252,20 @@ def train_classification(
     )
 
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
-    cv_scores = cross_validate(
+    logistic_c_analysis, selected_logistic_c = _analyze_logistic_c_values(
         logistic,
         x_train,
         y_train,
-        scoring={"f1": "f1", "roc_auc": "roc_auc"},
         cv=cv,
-        n_jobs=-1,
     )
+    logistic = logistic.set_params(model__C=selected_logistic_c)
     logistic.fit(x_train, y_train)
     forest.fit(x_train, y_train)
 
     if grid is not None:
         parameter_grid = grid
-    elif fast:
-        parameter_grid = {
-            "model__n_estimators": [20],
-            "model__max_depth": [8],
-            "model__min_samples_split": [2],
-        }
     else:
-        parameter_grid = {
-            "model__n_estimators": [100, 200],
-            "model__max_depth": [None, 8, 16],
-            "model__min_samples_split": [2, 5],
-        }
+        parameter_grid = RF_LOCAL_REFINEMENT_GRID
     search = GridSearchCV(
         clone(forest),
         parameter_grid,
@@ -261,7 +284,6 @@ def train_classification(
         cv,
         search.best_params_,
         latency_batch,
-        fast,
     )
     tuned_forest_cv_f1 = cross_validate(
         tuned_forest,
@@ -424,9 +446,13 @@ def train_classification(
     return {
         "metrics": metrics,
         "logistic_cv": {
-            "f1_mean": float(cv_scores["test_f1"].mean()),
-            "roc_auc_mean": float(cv_scores["test_roc_auc"].mean()),
+            "f1_mean": logistic_c_analysis[str(selected_logistic_c)]["cv_f1_mean"],
+            "roc_auc_mean": logistic_c_analysis[str(selected_logistic_c)][
+                "cv_roc_auc_mean"
+            ],
         },
+        "logistic_c_analysis": logistic_c_analysis,
+        "selected_logistic_c": selected_logistic_c,
         "best_params": search.best_params_,
         "best_cv_roc_auc": float(search.best_score_),
         "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),
