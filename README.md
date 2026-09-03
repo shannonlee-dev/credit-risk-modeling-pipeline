@@ -80,14 +80,14 @@ python -m pytest -v
 
 | 모델 | Accuracy | Precision | Recall | F1-Score | ROC-AUC | 예측 지연시간(ms) |
 |---|---:|---:|---:|---:|---:|---:|
-| 규칙 기반 | 0.7725 | 0.3285 | 0.8583 | 0.4752 | 0.8096 | 14.5058 |
-| Logistic Regression | 0.8775 | 0.4941 | **0.8708** | **0.6305** | **0.9505** | **3.3536** |
-| Random Forest | **0.9080** | **0.6573** | 0.4875 | 0.5598 | 0.9356 | 40.9794 |
-| Random Forest (튜닝) | 0.8835 | 0.5091 | 0.8125 | 0.6260 | 0.9381 | 37.8185 |
+| 규칙 기반 | 0.7725 | 0.3285 | 0.8583 | 0.4752 | 0.8096 | 13.5275 |
+| Logistic Regression | 0.8785 | 0.4965 | **0.8750** | **0.6335** | **0.9505** | **1.7027** |
+| Random Forest | **0.9095** | **0.6528** | 0.5250 | 0.5820 | 0.9376 | 36.8787 |
+| Random Forest (튜닝) | 0.8840 | 0.5102 | 0.8333 | 0.6329 | 0.9409 | 59.7413 |
 
-Logistic Regression은 규칙 기반보다 F1-Score가 약 32.7%, ROC-AUC가 약 17.4% 향상되었습니다. Accuracy만 보면 기본 Random Forest가 가장 높지만 연체 Recall이 0.4875로 낮아, 연체 고객을 정상으로 놓치는 비용이 큰 신용 심사에는 부적합합니다.
+Logistic Regression은 규칙 기반보다 F1-Score가 약 33.3%, ROC-AUC가 약 17.4% 향상되었습니다. Accuracy만 보면 기본 Random Forest가 가장 높지만 연체 Recall이 0.5250으로 낮아, 연체 고객을 정상으로 놓치는 비용이 큰 신용 심사에는 부적합합니다.
 
-튜닝된 Random Forest의 최적값은 `max_depth=8`, `min_samples_split=5`, `n_estimators=100`이며 Train 내부 CV F1은 0.6499입니다. 튜닝 후 기본 Forest 대비 F1은 0.5598에서 0.6260으로 약 11.8%, Recall은 0.4875에서 0.8125로 상승했습니다. 대신 오탐 증가로 Accuracy와 Precision은 낮아졌습니다.
+튜닝된 Random Forest의 최적값은 `max_depth=8`, `min_samples_split=5`, `n_estimators=200`이며 Train 내부 CV F1은 0.6662입니다. 튜닝 후 기본 Forest 대비 F1은 0.5820에서 0.6329로 약 8.8%, Recall은 0.5250에서 0.8333으로 상승했습니다. 대신 오탐 증가로 Accuracy와 Precision은 낮아졌습니다.
 
 ![Confusion Matrix](artifacts/confusion_matrix.png)
 
@@ -131,9 +131,9 @@ Random Forest는 여러 결정트리의 예측을 평균하여 단일 트리의 
 
 ![Feature Importance](artifacts/feature_importance.png)
 
-- 연 소득의 중요도가 51.9%로 가장 높아 분류 경계 형성에 가장 많이 사용되었습니다.
-- 최근 연체 횟수 22.8%, 부채 비율 15.9%가 뒤를 이어 데이터 생성 규칙과 일관된 결과를 보였습니다.
-- 카드 수 One-Hot 특성의 개별 중요도는 모두 0.3% 미만이어서 예측 기여가 제한적이었습니다.
+- 연 소득의 중요도가 50.9%로 가장 높아 분류 경계 형성에 가장 많이 사용되었습니다.
+- 최근 연체 횟수 24.5%, 부채 비율 16.2%가 뒤를 이어 데이터 생성 규칙과 일관된 결과를 보였습니다.
+- 수치형 카드 수의 중요도는 1.7%로 예측 기여가 제한적이었습니다.
 - 중요도는 영향의 방향이나 인과관계를 의미하지 않으며, 분할 기반 중요도에는 편향이 있을 수 있습니다.
 
 ## 회귀 성능
@@ -142,28 +142,28 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 
 | 모델 | 선택 Alpha | Test RMSE | Test MAE | Test R² |
 |---|---:|---:|---:|---:|
-| Ridge | 1.0 | 29.4103 | 23.3030 | 0.8602 |
-| Lasso | 0.1 | **29.3684** | **23.2766** | **0.8606** |
+| Ridge | 1.0 | 29.3667 | 23.2739 | 0.8607 |
+| Lasso | 0.1 | **29.3599** | **23.2711** | **0.8607** |
 
 두 모델 모두 약 86%의 신용점수 분산을 설명했으며 Lasso가 근소하게 우수했습니다. 지표는 clipping 전 원시 예측값으로 계산하여 범위 밖 오차를 숨기지 않았고, 사용자에게 제공하는 `credit_score_predictions.csv`의 예측값만 0~1000으로 제한했습니다.
 
 ![Ridge와 Lasso Alpha별 계수 변화](artifacts/regularization_coefficients.png)
 
-그래프의 계수는 원래 단위가 아니라 전처리 후 표준화 공간 기준입니다. Ridge의 L2 규제는 계수를 연속적으로 축소하면서 대부분 남기는 반면, Lasso의 L1 규제는 Alpha가 커질수록 중요도가 낮은 계수를 정확히 0으로 만들어 변수 선택 효과를 냅니다. 실제로 Lasso Alpha 0.1에서는 대부분의 카드 수 계수가 0이 되었고, Alpha 100에서는 모든 계수가 0으로 수축해 CV RMSE가 80.25까지 악화되었습니다.
+그래프의 계수는 원래 단위가 아니라 전처리 후 표준화 공간 기준입니다. Ridge의 L2 규제는 계수를 연속적으로 축소하면서 대부분 남기는 반면, Lasso의 L1 규제는 Alpha가 커질수록 중요도가 낮은 계수를 정확히 0으로 만들어 변수 선택 효과를 냅니다. 실제로 Lasso Alpha 1에서는 카드 수를 포함한 영향이 작은 특성의 계수가 0이 되었고, Alpha 100에서는 모든 계수가 0으로 수축해 CV RMSE가 80.25까지 악화되었습니다.
 
 ## 데이터 누수 방지
 
 - `credit_score`는 `is_overdue` 생성에 직접 사용되므로 분류 입력에서 제외했습니다. 두 타깃 모두 여섯 입력 특성에 포함하지 않았습니다.
-- 수치형 중앙값 대치와 Standard Scaling, 범주형 최빈값 대치와 One-Hot Encoding을 `ColumnTransformer`와 모델 `Pipeline` 안에 배치했습니다.
+- 여섯 수치형 특성의 중앙값 대치와 Standard Scaling을 `ColumnTransformer`와 모델 `Pipeline` 안에 배치했습니다.
 - 전처리기는 각 Train/CV fold에서만 fit되고 Test Set에는 transform만 수행합니다.
 - Random Forest GridSearchCV와 Ridge/Lasso Alpha 선택은 Train 내부 5-fold 결과만 사용합니다.
 - Test Set은 하이퍼파라미터 선택이 끝난 모델의 일반화 성능 산출에만 사용합니다.
 
-원 데이터에는 명시적 범주형 열이 없습니다. `credit_card_count`는 순서와 크기 의미가 있는 이산 수치지만, 수가 1~9로 제한되어 있고 수치형·범주형 파이프라인을 함께 검증하는 실습 목적상 범주형으로 처리했습니다. 이 선택은 카드 수의 선형 순서 정보를 직접 사용하지 않는다는 한계가 있습니다.
+원 데이터에는 명시적 범주형 열이 없습니다. `credit_card_count`와 `overdue_count_6m`은 정수로 표현된 횟수형 특성이므로, 값의 순서와 크기 정보를 보존하도록 다른 네 특성과 함께 수치형으로 처리했습니다.
 
 ## 운영 모델과 임계값
 
-최종 운영 후보로 Logistic Regression을 선택합니다. 튜닝 Forest보다 F1이 0.0045, AUC가 0.0124 높고 이번 환경에서 예측 지연시간도 약 11배 짧았습니다. 지연시간은 실행 환경에 따라 달라질 수 있지만, 현재는 앙상블의 복잡도와 응답 비용을 정당화할 성능 향상이 없습니다.
+최종 운영 후보로 Logistic Regression을 선택합니다. 튜닝 Forest보다 F1이 0.0006, AUC가 0.0095 높고 이번 환경에서 예측 지연시간도 훨씬 짧았습니다. 지연시간은 실행 환경에 따라 달라질 수 있지만, 현재는 앙상블의 복잡도와 응답 비용을 정당화할 성능 향상이 없습니다.
 
 연체 고객을 정상으로 판단하는 미탐은 원금·이자 손실로 이어질 수 있어 Recall/F1을 우선했습니다. 반대로 정상 고객을 연체로 판단하는 오탐은 승인 기회와 고객 신뢰를 잃게 합니다. 기본 임계값은 0.5이며, 미탐 비용이 더 크면 임계값을 낮춰 Recall을 높이고, 오탐 비용이나 심사 인력 부담이 더 크면 임계값을 높여 Precision을 높일 수 있습니다. 실제 운영에서는 두 오류의 금액 비용을 정의한 후 검증 데이터에서 기대 비용이 최소인 임계값을 선택해야 합니다.
 
@@ -174,7 +174,7 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 | `data_gen.py` | 제공된 규칙으로 10,000건 데이터 생성 |
 | `train.py` | 기존 API를 제공하고 전체 분석을 실행하는 CLI 진입점 |
 | `credit_risk/data.py` | 데이터 스키마, 로드·검증, Train/Test 분할 |
-| `credit_risk/preprocessing.py` | 수치형·범주형 공통 전처리 Pipeline 생성 |
+| `credit_risk/preprocessing.py` | 여섯 수치형 특성의 공통 전처리 Pipeline 생성 |
 | `credit_risk/classification.py` | 규칙·Logistic·Random Forest 학습 및 평가 |
 | `credit_risk/regression.py` | Ridge·Lasso 선택, 학습 및 평가 |
 | `credit_risk/reporting.py` | 그래프와 CSV·JSON 산출물 저장 |

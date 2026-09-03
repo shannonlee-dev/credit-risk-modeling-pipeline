@@ -51,14 +51,31 @@ def test_regression_split_uses_credit_score_target(finance_df):
     assert y_test.name == "credit_score"
 
 
-def test_preprocessor_has_numeric_and_categorical_paths():
+def test_preprocessor_treats_card_count_as_numeric():
+    features = pd.DataFrame(
+        {
+            "age": [20, 40],
+            "annual_income": [3000, 5000],
+            "spending_score": [30, 70],
+            "debt_ratio": [0.2, 0.8],
+            "overdue_count_6m": [0, 2],
+            "credit_card_count": [1, 9],
+        }
+    )
     preprocessor = build_preprocessor()
+    transformed = preprocessor.fit_transform(features)
 
     assert isinstance(preprocessor, ColumnTransformer)
-    assert {name for name, _, _ in preprocessor.transformers} == {
-        "numeric",
-        "categorical",
-    }
+    assert transformed.shape == (2, 6)
+    assert preprocessor.get_feature_names_out().tolist() == [
+        "numeric__age",
+        "numeric__annual_income",
+        "numeric__spending_score",
+        "numeric__debt_ratio",
+        "numeric__overdue_count_6m",
+        "numeric__credit_card_count",
+    ]
+    assert transformed[:, -1].tolist() == pytest.approx([-1.0, 1.0])
 
 
 def test_class_distribution_reports_literal_counts():

@@ -3,9 +3,9 @@
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 
-from credit_risk.data import CATEGORICAL_FEATURES, NUMERIC_FEATURES
+from credit_risk.data import NUMERIC_FEATURES
 
 
 def build_preprocessor() -> ColumnTransformer:
@@ -16,18 +16,4 @@ def build_preprocessor() -> ColumnTransformer:
             ("scaler", StandardScaler()),
         ]
     )
-    categorical = Pipeline(
-        [
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            (
-                "encoder",
-                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
-            ),
-        ]
-    )
-    return ColumnTransformer(
-        [
-            ("numeric", numeric, NUMERIC_FEATURES),
-            ("categorical", categorical, CATEGORICAL_FEATURES),
-        ]
-    )
+    return ColumnTransformer([("numeric", numeric, NUMERIC_FEATURES)])

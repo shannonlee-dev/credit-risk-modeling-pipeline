@@ -24,72 +24,64 @@
         "recall": 0.8583333333333333,
         "f1": 0.47520184544405997,
         "roc_auc": 0.809564393939394,
-        "prediction_latency_ms": 14.505778599414043
+        "prediction_latency_ms": 13.527484800033562
       },
       "Logistic Regression": {
-        "accuracy": 0.8775,
-        "precision": 0.4940898345153664,
-        "recall": 0.8708333333333333,
-        "f1": 0.6304675716440422,
-        "roc_auc": 0.95046875,
-        "prediction_latency_ms": 3.3536160000949167
+        "accuracy": 0.8785,
+        "precision": 0.49645390070921985,
+        "recall": 0.875,
+        "f1": 0.6334841628959276,
+        "roc_auc": 0.9504569128787878,
+        "prediction_latency_ms": 1.7026984000040102
       },
       "Random Forest": {
-        "accuracy": 0.908,
-        "precision": 0.6573033707865169,
-        "recall": 0.4875,
-        "f1": 0.5598086124401914,
-        "roc_auc": 0.9355930397727272,
-        "prediction_latency_ms": 40.97942700027488
+        "accuracy": 0.9095,
+        "precision": 0.6528497409326425,
+        "recall": 0.525,
+        "f1": 0.581986143187067,
+        "roc_auc": 0.9375568181818181,
+        "prediction_latency_ms": 36.87869400000636
       },
       "Random Forest (Tuned)": {
-        "accuracy": 0.8835,
-        "precision": 0.5091383812010444,
-        "recall": 0.8125,
-        "f1": 0.6260032102728732,
-        "roc_auc": 0.9380894886363637,
-        "prediction_latency_ms": 37.818482399598
+        "accuracy": 0.884,
+        "precision": 0.5102040816326531,
+        "recall": 0.8333333333333334,
+        "f1": 0.6329113924050633,
+        "roc_auc": 0.9409327651515151,
+        "prediction_latency_ms": 59.74130179997701
       }
     },
     "logistic_cv": {
-      "f1_mean": 0.6435186122570105,
-      "roc_auc_mean": 0.9536754048940292
+      "f1_mean": 0.6466698430739568,
+      "roc_auc_mean": 0.9538246416674676
     },
     "best_params": {
       "model__max_depth": 8,
       "model__min_samples_split": 5,
-      "model__n_estimators": 100
+      "model__n_estimators": 200
     },
-    "best_cv_f1": 0.6498937322296546,
+    "best_cv_f1": 0.6661945248228089,
     "feature_importance": {
-      "annual_income": 0.518697118357436,
-      "overdue_count_6m": 0.2276753670503602,
-      "debt_ratio": 0.15861666156380275,
-      "spending_score": 0.039456123587690024,
-      "age": 0.03300170701385474,
-      "credit_card_count_1": 0.0028356587477347947,
-      "credit_card_count_8": 0.0028214982311382977,
-      "credit_card_count_2": 0.0028050461108972,
-      "credit_card_count_7": 0.0026101961572386205,
-      "credit_card_count_4": 0.0025390770234511753,
-      "credit_card_count_9": 0.002487155957616726,
-      "credit_card_count_6": 0.002197327210423558,
-      "credit_card_count_5": 0.002149162141777271,
-      "credit_card_count_3": 0.0021079008465784495
+      "annual_income": 0.508703318330143,
+      "overdue_count_6m": 0.2445568409268422,
+      "debt_ratio": 0.16182955424230241,
+      "spending_score": 0.036177578707071535,
+      "age": 0.03128211929305567,
+      "credit_card_count": 0.017450588500585163
     }
   },
   "regression": {
     "cv_rmse": {
       "Ridge": {
-        "0.01": 29.778658453165605,
-        "0.1": 29.77865627152131,
-        "1": 29.778636475352403,
-        "10": 29.778639845627886,
-        "100": 29.79813150341219
+        "0.01": 29.77211242765916,
+        "0.1": 29.772112179032188,
+        "1": 29.772111667073112,
+        "10": 29.77230337053545,
+        "100": 29.793301660723888
       },
       "Lasso": {
-        "0.01": 29.777302887748156,
-        "0.1": 29.771199688034176,
+        "0.01": 29.77197802885151,
+        "0.1": 29.771587340361798,
         "1": 29.81794780742795,
         "10": 34.37504595375255,
         "100": 80.24950975160799
@@ -101,131 +93,75 @@
     },
     "test_metrics": {
       "Ridge": {
-        "rmse": 29.410265327880794,
-        "mae": 23.303028698900963,
-        "r2": 0.8602380865410363
+        "rmse": 29.366660643193338,
+        "mae": 23.273925433698714,
+        "r2": 0.8606522110861998
       },
       "Lasso": {
-        "rmse": 29.368371087402675,
-        "mae": 23.2765538082251,
-        "r2": 0.8606359781503063
+        "rmse": 29.359933334295878,
+        "mae": 23.27114470816371,
+        "r2": 0.8607160473022275
       }
     },
     "coefficients": {
       "Ridge": {
         "0.01": {
-          "age": -0.12155330984896125,
-          "annual_income": 57.828487620224685,
-          "spending_score": -0.32106939673335,
-          "debt_ratio": -28.81348152713855,
-          "overdue_count_6m": -36.054227589224055,
-          "credit_card_count_1": -0.9083786598336568,
-          "credit_card_count_2": -0.880868233337913,
-          "credit_card_count_3": -0.19558697928152302,
-          "credit_card_count_4": 0.27537492024260624,
-          "credit_card_count_5": 1.431149715480613,
-          "credit_card_count_6": -0.1992905575477967,
-          "credit_card_count_7": 0.34782358492966337,
-          "credit_card_count_8": -0.2892354094652379,
-          "credit_card_count_9": 0.4190116195015664
+          "age": -0.11005311977585672,
+          "annual_income": 57.824627632140256,
+          "spending_score": -0.31841338692216187,
+          "debt_ratio": -28.817860855556123,
+          "overdue_count_6m": -36.05762911907414,
+          "credit_card_count": 0.3243212941104481
         },
         "0.1": {
-          "age": -0.12156219307679275,
-          "annual_income": 57.827843950845256,
-          "spending_score": -0.3210584771110841,
-          "debt_ratio": -28.81316992586885,
-          "overdue_count_6m": -36.05382323305129,
-          "credit_card_count_1": -0.9082817079486405,
-          "credit_card_count_2": -0.8808243246373766,
-          "credit_card_count_3": -0.19560586894437304,
-          "credit_card_count_4": 0.27538691919519503,
-          "credit_card_count_5": 1.4310051280859901,
-          "credit_card_count_6": -0.19924153877357653,
-          "credit_card_count_7": 0.3477523198397793,
-          "credit_card_count_8": -0.28917613317822927,
-          "credit_card_count_9": 0.41898520644102194
+          "age": -0.11006344383697957,
+          "annual_income": 57.823984227163244,
+          "spending_score": -0.3184029880120276,
+          "debt_ratio": -28.8175494954675,
+          "overdue_count_6m": -36.05722520319018,
+          "credit_card_count": 0.3243296948515217
         },
         "1": {
-          "age": -0.12165101449916446,
-          "annual_income": 57.82140804985226,
-          "spending_score": -0.32094930642316066,
-          "debt_ratio": -28.810054287544688,
-          "overdue_count_6m": -36.04978017533519,
-          "credit_card_count_1": -0.9073132962786664,
-          "credit_card_count_2": -0.8803856818765015,
-          "credit_card_count_3": -0.1957945033330863,
-          "credit_card_count_4": 0.27550673149747207,
-          "credit_card_count_5": 1.429560870955936,
-          "credit_card_count_6": -0.19875191023784627,
-          "credit_card_count_7": 0.3470404917257094,
-          "credit_card_count_8": -0.2885840562255643,
-          "credit_card_count_9": 0.4187213537801693
+          "age": -0.11016665719652209,
+          "annual_income": 57.81755096561231,
+          "spending_score": -0.31829901966505847,
+          "debt_ratio": -28.81443626422374,
+          "overdue_count_6m": -36.05318654199254,
+          "credit_card_count": 0.3244136772702612
         },
         "10": {
-          "age": -0.12253813010581396,
-          "annual_income": 57.757128217152406,
-          "spending_score": -0.31986014461138906,
-          "debt_ratio": -28.77893529180511,
-          "overdue_count_6m": -36.00939993025486,
-          "credit_card_count_1": -0.8977387032200805,
-          "credit_card_count_2": -0.8760432433741637,
-          "credit_card_count_3": -0.19765499212295567,
-          "credit_card_count_4": 0.276687263576805,
-          "credit_card_count_5": 1.4152781085985577,
-          "credit_card_count_6": -0.19391101077789852,
-          "credit_card_count_7": 0.3400035199176012,
-          "credit_card_count_8": -0.2827311877466838,
-          "credit_card_count_9": 0.41611024514949346
+          "age": -0.1111960708478202,
+          "annual_income": 57.75329707459788,
+          "spending_score": -0.3172614081279185,
+          "debt_ratio": -28.783340871847795,
+          "overdue_count_6m": -36.01284963241341,
+          "credit_card_count": 0.32525100715843963
         },
         "100": {
-          "age": -0.13128816033272012,
-          "annual_income": 57.12214642909804,
-          "spending_score": -0.30921517374631063,
-          "debt_ratio": -28.471435394974282,
-          "overdue_count_6m": -35.61056311552486,
-          "credit_card_count_1": -0.8118143259707763,
-          "credit_card_count_2": -0.8365677582884287,
-          "credit_card_count_3": -0.21394536187496785,
-          "credit_card_count_4": 0.2869120641301838,
-          "credit_card_count_5": 1.28680896563326,
-          "credit_card_count_6": -0.15049770635973472,
-          "credit_card_count_7": 0.2769521434787519,
-          "credit_card_count_8": -0.23031090260949236,
-          "credit_card_count_9": 0.39246288186127043
+          "age": -0.1212233507449902,
+          "annual_income": 57.118534372954066,
+          "spending_score": -0.3070890349117592,
+          "debt_ratio": -28.476035292825973,
+          "overdue_count_6m": -35.61438973722595,
+          "credit_card_count": 0.3333796944485313
         }
       },
       "Lasso": {
         "0.01": {
-          "age": -0.10998178002853032,
-          "annual_income": 57.819337610751276,
-          "spending_score": -0.3101161534859663,
-          "debt_ratio": -28.80318562156703,
-          "overdue_count_6m": -36.044873921618205,
-          "credit_card_count_1": -0.6683281582278194,
-          "credit_card_count_2": -0.6407016703340882,
-          "credit_card_count_3": -0.0,
-          "credit_card_count_4": 0.33274578129795646,
-          "credit_card_count_5": 1.4886633143522703,
-          "credit_card_count_6": -0.0,
-          "credit_card_count_7": 0.4078832619334442,
-          "credit_card_count_8": -0.04972263728561687,
-          "credit_card_count_9": 0.4787089401432722
+          "age": -0.10026995741301735,
+          "annual_income": 57.815330825943136,
+          "spending_score": -0.3081294444818747,
+          "debt_ratio": -28.807629761217495,
+          "overdue_count_6m": -36.04782337048339,
+          "credit_card_count": 0.31434683241605954
         },
         "0.1": {
-          "age": -0.014062466294706553,
-          "annual_income": 57.7370226047313,
-          "spending_score": -0.21395992862067176,
-          "debt_ratio": -28.71373925434015,
-          "overdue_count_6m": -35.957233244475155,
-          "credit_card_count_1": -0.0,
-          "credit_card_count_2": -0.0,
-          "credit_card_count_3": -0.0,
-          "credit_card_count_4": 0.0,
-          "credit_card_count_5": 0.5837086065173963,
-          "credit_card_count_6": -0.0,
-          "credit_card_count_7": 0.0,
-          "credit_card_count_8": -0.0,
-          "credit_card_count_9": 0.0
+          "age": -0.01223204343663869,
+          "annual_income": 57.73101610969234,
+          "spending_score": -0.21556360363293206,
+          "debt_ratio": -28.715238550416103,
+          "overdue_count_6m": -35.95916771428132,
+          "credit_card_count": 0.22458507990882096
         },
         "1": {
           "age": -0.0,
@@ -233,15 +169,7 @@
           "spending_score": -0.0,
           "debt_ratio": -27.826420682431273,
           "overdue_count_6m": -35.06239390079598,
-          "credit_card_count_1": -0.0,
-          "credit_card_count_2": -0.0,
-          "credit_card_count_3": -0.0,
-          "credit_card_count_4": 0.0,
-          "credit_card_count_5": 0.0,
-          "credit_card_count_6": -0.0,
-          "credit_card_count_7": 0.0,
-          "credit_card_count_8": -0.0,
-          "credit_card_count_9": 0.0
+          "credit_card_count": 0.0
         },
         "10": {
           "age": -0.0,
@@ -249,15 +177,7 @@
           "spending_score": -0.0,
           "debt_ratio": -19.003953750132776,
           "overdue_count_6m": -26.083982244241618,
-          "credit_card_count_1": -0.0,
-          "credit_card_count_2": -0.0,
-          "credit_card_count_3": -0.0,
-          "credit_card_count_4": 0.0,
-          "credit_card_count_5": 0.0,
-          "credit_card_count_6": 0.0,
-          "credit_card_count_7": -0.0,
-          "credit_card_count_8": 0.0,
-          "credit_card_count_9": 0.0
+          "credit_card_count": 0.0
         },
         "100": {
           "age": -0.0,
@@ -265,15 +185,7 @@
           "spending_score": 0.0,
           "debt_ratio": -0.0,
           "overdue_count_6m": -0.0,
-          "credit_card_count_1": -0.0,
-          "credit_card_count_2": -0.0,
-          "credit_card_count_3": -0.0,
-          "credit_card_count_4": 0.0,
-          "credit_card_count_5": 0.0,
-          "credit_card_count_6": 0.0,
-          "credit_card_count_7": -0.0,
-          "credit_card_count_8": 0.0,
-          "credit_card_count_9": 0.0
+          "credit_card_count": 0.0
         }
       }
     }

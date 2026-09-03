@@ -20,8 +20,9 @@ NUMERIC_FEATURES = [
     "spending_score",
     "debt_ratio",
     "overdue_count_6m",
+    "credit_card_count",
 ]
-CATEGORICAL_FEATURES = ["credit_card_count"]
+CATEGORICAL_FEATURES: list[str] = []
 TARGET_COLUMNS = ["credit_score", "is_overdue"]
 REQUIRED_COLUMNS = FEATURE_COLUMNS + TARGET_COLUMNS
 
