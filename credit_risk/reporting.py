@@ -48,7 +48,11 @@ def _save_confusion_matrices(
     plt.close(figure)
 
 
-def _save_threshold_sweep(sweep: pd.DataFrame, output_path: Path) -> None:
+def _save_threshold_sweep(
+    sweep: pd.DataFrame,
+    output_path: Path,
+    model_name: str,
+) -> None:
     figure, axis = plt.subplots(figsize=(8, 5))
     for metric in ["precision", "recall", "f1"]:
         axis.plot(
@@ -59,9 +63,19 @@ def _save_threshold_sweep(sweep: pd.DataFrame, output_path: Path) -> None:
             label=metric.capitalize(),
         )
     axis.axvline(0.50, color="black", linestyle="--", label="Baseline 0.50")
+    if sweep["is_selected"].any():
+        selected_threshold = sweep.loc[
+            sweep["is_selected"], "threshold"
+        ].iloc[0]
+        axis.axvline(
+            selected_threshold,
+            color="tab:orange",
+            linestyle="--",
+            label=f"Selected {selected_threshold:.2f}",
+        )
     axis.set_xlabel("Decision threshold")
     axis.set_ylabel("OOF metric")
-    axis.set_title("Logistic Regression Threshold Sweep (Train OOF)")
+    axis.set_title(f"{model_name} Threshold Sweep (Train OOF)")
     axis.legend()
     figure.tight_layout()
     figure.savefig(output_path, dpi=150)
@@ -172,11 +186,11 @@ def save_classification_artifacts(
     _save_confusion_matrices(
         y_test,
         {
-            "Logistic Regression (0.50 baseline)": table[
-                "logistic_prediction_default"
+            "Logistic Regression (selected 0.45)": table[
+                "logistic_prediction_selected"
             ].to_numpy(),
-            "Random Forest (Tuned, 0.50 baseline)": table[
-                "tuned_rf_prediction_default"
+            "Random Forest (Tuned, selected 0.33)": table[
+                "tuned_rf_prediction_selected"
             ].to_numpy(),
         },
         destination / "confusion_matrix.png",
@@ -200,14 +214,25 @@ def save_classification_artifacts(
         result["best_params"]["model__n_estimators"],
         destination / "random_forest_n_estimators_curve.png",
     )
-    result["threshold_sweep"].to_csv(
-        destination / "threshold_sweep.csv",
+    result["logistic_threshold_sweep"].to_csv(
+        destination / "logistic_threshold_sweep.csv",
         index=False,
         float_format="%.6f",
     )
     _save_threshold_sweep(
-        result["threshold_sweep"],
-        destination / "threshold_sweep.png",
+        result["logistic_threshold_sweep"],
+        destination / "logistic_threshold_sweep.png",
+        "Logistic Regression",
+    )
+    result["random_forest_threshold_sweep"].to_csv(
+        destination / "random_forest_threshold_sweep.csv",
+        index=False,
+        float_format="%.6f",
+    )
+    _save_threshold_sweep(
+        result["random_forest_threshold_sweep"],
+        destination / "random_forest_threshold_sweep.png",
+        "Tuned Random Forest",
     )
     table.to_csv(destination / "classification_predictions.csv", index=False)
 
@@ -258,7 +283,13 @@ def metrics_report(result: dict) -> dict:
         "classification": _without_timing({
             key: value
             for key, value in classification.items()
-            if key not in {"predictions", "threshold_sweep", "latency_benchmark"}
+            if key
+            not in {
+                "predictions",
+                "logistic_threshold_sweep",
+                "random_forest_threshold_sweep",
+                "latency_benchmark",
+            }
         }),
         "regression": {
             key: value

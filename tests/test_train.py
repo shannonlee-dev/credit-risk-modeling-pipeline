@@ -27,6 +27,8 @@ from credit_risk.classification import (
     LOGISTIC_C_VALUES,
     RF_MAX_DEPTH_VALUES,
     RF_MIN_SAMPLES_SPLIT_VALUES,
+    SELECTED_LOGISTIC_THRESHOLD,
+    SELECTED_RANDOM_FOREST_THRESHOLD,
 )
 
 
@@ -162,7 +164,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         } <= metrics.keys()
         assert 0 <= metrics["f1"] <= 1
         assert 0 <= metrics["roc_auc"] <= 1
-    assert result["best_params"]["model__n_estimators"] == 200
+    assert result["best_params"]["model__n_estimators"] == 100
     logistic_c_analysis = result["logistic_c_analysis"]
     assert LOGISTIC_C_VALUES == [0.001, 0.003, 0.01, 0.03, 0.1]
     assert set(logistic_c_analysis) == {str(value) for value in LOGISTIC_C_VALUES}
@@ -171,6 +173,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         assert values["cv_roc_auc_std"] >= 0
         assert 0 <= values["cv_f1_mean"] <= 1
     assert result["selected_logistic_c"] in LOGISTIC_C_VALUES
+    assert result["selected_classification_model"] == "Logistic Regression"
     assert RF_MAX_DEPTH_VALUES == [8]
     assert RF_MIN_SAMPLES_SPLIT_VALUES == [5, 10, 20, 40, 80]
     assert len(RF_MAX_DEPTH_VALUES) * len(RF_MIN_SAMPLES_SPLIT_VALUES) == 5
@@ -201,10 +204,11 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         assert values["fit_time_seconds"] > 0
         assert values["batch_prediction_latency_ms"] > 0
     assert result["predictions"]["overdue_probability"].between(0, 1).all()
-    sweep = result["threshold_sweep"]
+    sweep = result["logistic_threshold_sweep"]
     assert list(sweep) == [
         "threshold",
         "is_baseline",
+        "is_selected",
         "predicted_overdue",
         "tp",
         "fp",
@@ -219,14 +223,51 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
     baseline = sweep.loc[sweep["is_baseline"]]
     assert len(baseline) == 1
     assert baseline.iloc[0]["threshold"] == 0.50
+    selected = sweep.loc[sweep["is_selected"]]
+    assert len(selected) == 1
+    assert selected.iloc[0]["threshold"] == SELECTED_LOGISTIC_THRESHOLD == 0.45
+    random_forest_sweep = result["random_forest_threshold_sweep"]
+    assert list(random_forest_sweep) == list(sweep)
+    assert random_forest_sweep["threshold"].tolist() == pytest.approx(
+        np.linspace(0.30, 0.60, 31)
+    )
+    assert len(random_forest_sweep.loc[random_forest_sweep["is_baseline"]]) == 1
+    selected_random_forest = random_forest_sweep.loc[
+        random_forest_sweep["is_selected"]
+    ]
+    assert len(selected_random_forest) == 1
+    assert (
+        selected_random_forest.iloc[0]["threshold"]
+        == SELECTED_RANDOM_FOREST_THRESHOLD
+        == 0.33
+    )
     assert (
         (sweep[["precision", "recall", "f1"]] >= 0)
         & (sweep[["precision", "recall", "f1"]] <= 1)
     ).all().all()
     assert {
-        "logistic_prediction_default",
-        "tuned_rf_prediction_default",
+        "logistic_prediction_selected",
+        "tuned_rf_prediction_selected",
     } <= set(result["predictions"])
+    assert result["selected_logistic_threshold"] == SELECTED_LOGISTIC_THRESHOLD
+    assert (
+        result["selected_random_forest_threshold"]
+        == SELECTED_RANDOM_FOREST_THRESHOLD
+    )
+    assert np.array_equal(
+        result["predictions"]["logistic_prediction_selected"].to_numpy(),
+        (
+            result["predictions"]["logistic_probability"].to_numpy()
+            >= SELECTED_LOGISTIC_THRESHOLD
+        ).astype(int),
+    )
+    assert np.array_equal(
+        result["predictions"]["tuned_rf_prediction_selected"].to_numpy(),
+        (
+            result["predictions"]["overdue_probability"].to_numpy()
+            >= SELECTED_RANDOM_FOREST_THRESHOLD
+        ).astype(int),
+    )
     latency_benchmark = result["latency_benchmark"]
     assert latency_benchmark == {
         "batch_rows": len(x_train),
@@ -239,8 +280,10 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "roc_curve.png",
         "feature_importance.png",
         "random_forest_n_estimators_curve.png",
-        "threshold_sweep.csv",
-        "threshold_sweep.png",
+        "logistic_threshold_sweep.csv",
+        "logistic_threshold_sweep.png",
+        "random_forest_threshold_sweep.csv",
+        "random_forest_threshold_sweep.png",
     ]:
         assert (output_dir / name).stat().st_size > 0
     assert not (output_dir / "confusion_matrix_threshold_comparison.png").exists()
@@ -291,7 +334,8 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     assert set(result["data_distribution"]) == {"all", "train", "test"}
     report = json.loads((output_dir / "metrics.json").read_text(encoding="utf-8"))
     assert "predictions" not in report["classification"]
-    assert "threshold_sweep" not in report["classification"]
+    assert "logistic_threshold_sweep" not in report["classification"]
+    assert "random_forest_threshold_sweep" not in report["classification"]
     assert "latency_benchmark" not in report["classification"]
     assert "predictions" not in report["regression"]
     assert "threshold_analysis" not in report["classification"]
@@ -308,8 +352,10 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     )
     assert len(report["classification"]["random_forest_saturation"]) >= 5
     assert (output_dir / "random_forest_n_estimators_curve.png").is_file()
-    assert (output_dir / "threshold_sweep.csv").is_file()
-    assert (output_dir / "threshold_sweep.png").is_file()
+    assert (output_dir / "logistic_threshold_sweep.csv").is_file()
+    assert (output_dir / "logistic_threshold_sweep.png").is_file()
+    assert (output_dir / "random_forest_threshold_sweep.csv").is_file()
+    assert (output_dir / "random_forest_threshold_sweep.png").is_file()
     assert (output_dir / "classification_predictions.csv").is_file()
     assert (output_dir / "credit_score_predictions.csv").is_file()
 

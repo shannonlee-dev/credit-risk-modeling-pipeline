@@ -27,13 +27,16 @@ from credit_risk.preprocessing import build_preprocessor
 
 
 DEFAULT_THRESHOLD = 0.5
+SELECTED_LOGISTIC_THRESHOLD = 0.45
+SELECTED_RANDOM_FOREST_THRESHOLD = 0.33
+SELECTED_CLASSIFICATION_MODEL = "Logistic Regression"
 SWEEP_THRESHOLDS = np.linspace(0.30, 0.60, 31)
 LOGISTIC_C_VALUES = [0.001, 0.003, 0.01, 0.03, 0.1]
 N_ESTIMATOR_VALUES = [25, 50, 100, 200, 300, 500]
 RF_MAX_DEPTH_VALUES = [8]
 RF_MIN_SAMPLES_SPLIT_VALUES = [5, 10, 20, 40, 80]
 RF_LOCAL_REFINEMENT_GRID = {
-    "model__n_estimators": [200],
+    "model__n_estimators": [100],
     "model__max_depth": RF_MAX_DEPTH_VALUES,
     "model__min_samples_split": RF_MIN_SAMPLES_SPLIT_VALUES,
 }
@@ -107,8 +110,9 @@ def _feature_importance(model: Pipeline) -> dict[str, float]:
 def _threshold_sweep(
     y_train: pd.Series,
     oof_scores: np.ndarray,
+    selected_threshold: float | None = None,
 ) -> pd.DataFrame:
-    """Summarize Logistic Train-OOF outcomes without selecting a threshold."""
+    """Summarize Train-OOF outcomes without selecting a threshold."""
     y_values = y_train.to_numpy()
     rows = []
     for raw_threshold in SWEEP_THRESHOLDS:
@@ -118,6 +122,7 @@ def _threshold_sweep(
             {
                 "threshold": threshold,
                 "is_baseline": threshold == DEFAULT_THRESHOLD,
+                "is_selected": threshold == selected_threshold,
                 "predicted_overdue": int(predictions.sum()),
                 "tp": int(np.sum((y_values == 1) & predictions)),
                 "fp": int(np.sum((y_values == 0) & predictions)),
@@ -300,15 +305,36 @@ def train_classification(
         method="predict_proba",
         n_jobs=-1,
     )[:, 1]
-    threshold_sweep = _threshold_sweep(y_train, logistic_oof_scores)
+    threshold_sweep = _threshold_sweep(
+        y_train,
+        logistic_oof_scores,
+        selected_threshold=SELECTED_LOGISTIC_THRESHOLD,
+    )
+    random_forest_oof_scores = cross_val_predict(
+        tuned_forest,
+        x_train,
+        y_train,
+        cv=cv,
+        method="predict_proba",
+        n_jobs=-1,
+    )[:, 1]
+    random_forest_threshold_sweep = _threshold_sweep(
+        y_train,
+        random_forest_oof_scores,
+        selected_threshold=SELECTED_RANDOM_FOREST_THRESHOLD,
+    )
 
     rule_predictions = x_test.apply(rule_based_predict, axis=1).to_numpy()
     logistic_scores = logistic.predict_proba(x_test)[:, 1]
     forest_scores = forest.predict_proba(x_test)[:, 1]
     tuned_scores = tuned_forest.predict_proba(x_test)[:, 1]
-    logistic_predictions = (logistic_scores >= DEFAULT_THRESHOLD).astype(int)
+    logistic_predictions = (
+        logistic_scores >= SELECTED_LOGISTIC_THRESHOLD
+    ).astype(int)
     forest_predictions = (forest_scores >= DEFAULT_THRESHOLD).astype(int)
-    tuned_predictions = (tuned_scores >= DEFAULT_THRESHOLD).astype(int)
+    tuned_predictions = (
+        tuned_scores >= SELECTED_RANDOM_FOREST_THRESHOLD
+    ).astype(int)
 
     latencies = {
         "Rule Baseline": _average_latency_ms(
@@ -350,10 +376,10 @@ def train_classification(
             "actual_is_overdue": y_test.to_numpy(),
             "rule_prediction": rule_predictions,
             "logistic_probability": logistic_scores,
-            "logistic_prediction_default": logistic_predictions,
+            "logistic_prediction_selected": logistic_predictions,
             "random_forest_probability": forest_scores,
             "overdue_probability": tuned_scores,
-            "tuned_rf_prediction_default": tuned_predictions,
+            "tuned_rf_prediction_selected": tuned_predictions,
         }
     )
     return {
@@ -366,6 +392,9 @@ def train_classification(
         },
         "logistic_c_analysis": logistic_c_analysis,
         "selected_logistic_c": selected_logistic_c,
+        "selected_classification_model": SELECTED_CLASSIFICATION_MODEL,
+        "selected_logistic_threshold": SELECTED_LOGISTIC_THRESHOLD,
+        "selected_random_forest_threshold": SELECTED_RANDOM_FOREST_THRESHOLD,
         "best_params": search.best_params_,
         "best_cv_roc_auc": float(search.best_score_),
         "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),
@@ -374,7 +403,8 @@ def train_classification(
         ),
         "random_forest_saturation": random_forest_saturation,
         "feature_importance": _feature_importance(tuned_forest),
-        "threshold_sweep": threshold_sweep,
+        "logistic_threshold_sweep": threshold_sweep,
+        "random_forest_threshold_sweep": random_forest_threshold_sweep,
         "latency_benchmark": {
             "source": "training_feature_batch",
             "batch_rows": len(latency_batch),

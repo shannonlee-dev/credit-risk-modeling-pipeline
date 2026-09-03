@@ -32,17 +32,17 @@ uv run python -m pytest -v
 | Model | Accuracy | F1 | ROC-AUC |
 | --- | ---: | ---: | ---: |
 | Rule Baseline | 0.7725 | 0.4752 | 0.8096 |
-| Logistic Regression | 0.8735 | 0.6274 | 0.9505 |
+| Logistic Regression (threshold 0.45) | 0.8515 | 0.6013 | 0.9505 |
 | Random Forest | 0.9095 | 0.5820 | 0.9376 |
-| Random Forest (Tuned) | 0.8810 | 0.6316 | 0.9403 |
+| Random Forest (Tuned, threshold 0.33) | 0.8365 | 0.5725 | 0.9405 |
 
 상세 CV·threshold·hyperparameter 결과는 [model_selection.md](docs/model_selection.md)와 [metrics.json](artifacts/metrics.json)을 참조합니다.
 
-규칙 기반 기준선보다 로지스틱 회귀는 F1을 `0.4752 → 0.6274`, ROC-AUC를 `0.8096 → 0.9505`로 높였습니다. Tuned RF는 F1이 조금 높지만, 모델 선택은 holdout이 아닌 학습 5-fold CV ROC-AUC와 단순성을 기준으로 합니다.
+규칙 기반 기준선보다 로지스틱 회귀는 F1을 `0.4752 → 0.6013`, ROC-AUC를 `0.8096 → 0.9505`로 높였습니다. 비슷한 OOF Recall 조건으로 맞춘 선택 threshold에서는 Logistic이 Tuned RF보다 Precision과 F1이 높아 최종 분류 모델로 선택했습니다.
 
 ![분류 ROC-AUC 비교](artifacts/roc_curve.png)
 
-![0.50 baseline 혼동행렬](artifacts/confusion_matrix.png)
+![선택된 Logistic 0.45와 Tuned RF 0.33 혼동행렬](artifacts/confusion_matrix.png)
 
 ## 주요 회귀 결과
 
@@ -61,11 +61,15 @@ Tuned RF의 feature importance는 `annual_income`, `overdue_count_6m`, `debt_rat
 
 ![Tuned RF 특징 중요도](artifacts/feature_importance.png)
 
-오탐(FP)은 정상 고객의 추가 심사를 늘리고, 미탐(FN)은 연체 위험을 놓칠 수 있습니다. 운영 임계값은 자동으로 선택하지 않습니다. Logistic Regression의 Train OOF probability만으로 `0.30~0.60`을 sweep한 표와 그래프를 먼저 검토하고, `0.50` baseline과 비용·심사 역량을 비교해 사람이 결정합니다. Holdout 레이블은 threshold 선택에 사용하지 않습니다.
+오탐(FP)은 정상 고객의 추가 심사를 늘리고, 미탐(FN)은 연체 위험을 놓칠 수 있습니다. 연체 고객을 놓치는 False Negative의 비용을 더 중요하게 보아, 기본 `0.50`보다 보수적인 `0.45` threshold를 선택했습니다. Logistic Train OOF 기준 Recall은 `93.13% → 94.59%`로 증가했으며, 이에 따른 Precision 감소와 False Positive 증가를 의도적으로 수용했습니다. 이 선택에는 Train OOF probability만 사용했고, Holdout에는 `0.45`를 한 번 적용해 최종 성능을 확인했습니다.
 
-![Logistic Train OOF threshold sweep](artifacts/threshold_sweep.png)
+![Logistic Train OOF threshold sweep](artifacts/logistic_threshold_sweep.png)
 
-랜덤 포레스트는 200개 트리 이후 CV ROC-AUC 개선이 작아집니다. 하드웨어 의존적인 batch 예측시간은 `metrics.json`의 `benchmark`에 한 번만 기록하며, 실제 단건 서비스 지연시간으로 해석하지 않습니다.
+Tuned Random Forest는 `n_estimators=100` 설정에서 Logistic과 비슷한 OOF Recall 조건을 맞추기 위해 `0.33` threshold를 선택했습니다. Logistic `0.45`의 OOF Recall `94.59%`와 RF `0.33`의 `94.48%`는 0.10%p 차이입니다. 이 조건에서 Logistic은 RF보다 FP가 `83`건 적고 Precision/F1도 `44.56%`/`0.6058` 대 `42.79%`/`0.5890`으로 높습니다. Holdout에는 선택 후 각각 한 번만 적용했으며, Logistic Recall/F1은 `93.33%`/`0.6013`, RF는 `91.25%`/`0.5725`였습니다. 따라서 OOF의 유사 Recall 조건이 Holdout에서 완전히 재현된다고 해석하지 않습니다.
+
+![Tuned Random Forest Train OOF threshold sweep](artifacts/random_forest_threshold_sweep.png)
+
+Tuned Random Forest는 `n_estimators=100`을 선택했습니다. 200개로 늘리면 Train 5-fold CV ROC-AUC가 `0.948000 → 0.948212`로 `0.000212`만 상승하고 F1은 오히려 `0.656051 → 0.655971`로 소폭 낮아졌습니다. 같은 실행의 2,000건 배치 기준으로 CV 폴드당 평균 학습시간은 `0.801초 → 1.626초`, 예측시간은 `35.40ms → 74.96ms`가 됩니다. 트리 수와 모델 저장 공간도 대체로 두 배가 되므로, 이 작은 ROC-AUC 차이보다 비용 효율을 우선해 100개를 사용합니다. 이 batch 벤치마크는 하드웨어·부하·`n_jobs`에 의존하며 실제 단건 서비스 지연시간으로 해석하지 않습니다.
 
 ![랜덤 포레스트 트리 수 민감도](artifacts/random_forest_n_estimators_curve.png)
 
@@ -94,4 +98,4 @@ tests/                         # 동작 중심 회귀 테스트
 
 - 가상 데이터로는 실제 신용 의사결정이나 실제 신청자 집단에 대한 주장을 뒷받침할 수 없습니다.
 - 확률 보정, 비용 행렬, 심사 역량 제약, 공정성 분석, 시간 기준 검증은 포함하지 않습니다.
-- threshold sweep은 Train OOF 결과만 보여주며, 최종 운영 threshold는 비용과 심사 역량을 고려해 사람이 선택해야 합니다.
+- threshold `0.45`는 이 가상 데이터의 Train OOF sweep과 FN 우선 비용 가정에 따른 선택이며, 실제 운영 전에는 비용·심사 역량·공정성 검증이 필요합니다.
