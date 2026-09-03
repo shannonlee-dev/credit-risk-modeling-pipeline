@@ -207,6 +207,34 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     assert (output_dir / "credit_score_predictions.csv").is_file()
 
 
+def test_training_computation_does_not_write_artifacts(
+    finance_df,
+    tmp_path,
+    monkeypatch,
+):
+    from credit_risk.classification import train_classification
+    from credit_risk.regression import train_regression
+
+    sample = finance_df.head(400)
+    classification_split = split_classification_data(sample)
+    regression_split = split_regression_data(sample)
+    monkeypatch.chdir(tmp_path)
+
+    classification = train_classification(
+        *classification_split,
+        grid={
+            "model__n_estimators": [10],
+            "model__max_depth": [4],
+            "model__min_samples_split": [2],
+        },
+    )
+    regression = train_regression(*regression_split)
+
+    assert "metrics" in classification
+    assert "test_metrics" in regression
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_import_uses_writable_matplotlib_cache():
     environment = os.environ.copy()
     environment["HOME"] = "/proc/credit-risk-unwritable-home"

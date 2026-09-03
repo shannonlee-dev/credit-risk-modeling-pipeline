@@ -18,17 +18,18 @@
 ```mermaid
 flowchart LR
     A[data_gen.py] --> B[finance_data.csv]
-    B --> C[로드 및 스키마 검증]
-    C --> D[8:2 Train/Test 분할]
-    D --> E[분류 Pipeline]
-    D --> F[회귀 Pipeline]
-    E --> G[규칙·Logistic·Random Forest 평가]
-    F --> H[Ridge·Lasso 평가]
-    G --> I[metrics.json 및 시각화]
-    H --> I
+    B --> C[credit_risk.data]
+    C --> D[credit_risk.preprocessing]
+    D --> E[credit_risk.classification]
+    D --> F[credit_risk.regression]
+    E --> G[credit_risk.workflow]
+    F --> G
+    G --> H[credit_risk.reporting]
+    H --> I[metrics.json·CSV·시각화]
+    J[train.py CLI] --> G
 ```
 
-`train.py` 내부는 데이터 로드·검증, 공통 특성 정의, 분할, 전처리기 생성, 규칙 평가, 분류 학습·평가, 회귀 학습·평가, 시각화·저장 단계로 역할을 구분합니다. 회귀와 분류는 동일한 입력 특성과 전처리 원칙을 공유하지만, 분할 이후 타깃·모델·평가지표에서 독립적으로 분기합니다.
+`credit_risk` 패키지는 데이터 로드·분할, 공통 전처리, 분류와 회귀 학습, 결과 저장을 책임별 모듈로 분리합니다. 계산 함수인 `train_classification()`과 `train_regression()`은 파일을 생성하지 않아 독립적으로 재사용할 수 있고, `workflow`가 계산과 `reporting`을 연결합니다. 루트 `train.py`는 기존 실행 방법과 import 호환성을 유지하는 CLI 진입점입니다.
 
 ## 빠른 시작
 
@@ -171,7 +172,13 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 | 파일 | 역할 |
 |---|---|
 | `data_gen.py` | 제공된 규칙으로 10,000건 데이터 생성 |
-| `train.py` | 검증, 분할, 전처리, 모델 학습·평가, 결과 저장 |
+| `train.py` | 기존 API를 제공하고 전체 분석을 실행하는 CLI 진입점 |
+| `credit_risk/data.py` | 데이터 스키마, 로드·검증, Train/Test 분할 |
+| `credit_risk/preprocessing.py` | 수치형·범주형 공통 전처리 Pipeline 생성 |
+| `credit_risk/classification.py` | 규칙·Logistic·Random Forest 학습 및 평가 |
+| `credit_risk/regression.py` | Ridge·Lasso 선택, 학습 및 평가 |
+| `credit_risk/reporting.py` | 그래프와 CSV·JSON 산출물 저장 |
+| `credit_risk/workflow.py` | 분류·회귀 계산과 리포팅 실행 흐름 조립 |
 | `tests/test_data_gen.py` | 데이터 크기·범위·재현성 검증 |
 | `tests/test_train.py` | 누수 방지, 규칙, 분류·회귀·산출물 검증 |
 | `artifacts/metrics.json` | 클래스 분포, CV, Test 성능, 계수·중요도 기록 |
