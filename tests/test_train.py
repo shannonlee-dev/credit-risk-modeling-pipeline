@@ -166,6 +166,22 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "model__min_samples_split": 2,
         "model__n_estimators": 20,
     }
+    saturation = result["random_forest_saturation"]
+    assert len(saturation) >= 5
+    assert set(saturation) == {"25", "50", "100", "200", "300", "500"}
+    for values in saturation.values():
+        assert {
+            "cv_roc_auc_mean",
+            "cv_roc_auc_std",
+            "cv_f1_mean",
+            "fit_time_seconds",
+            "prediction_latency_ms",
+        } <= values.keys()
+        assert 0 <= values["cv_roc_auc_mean"] <= 1
+        assert values["cv_roc_auc_std"] >= 0
+        assert 0 <= values["cv_f1_mean"] <= 1
+        assert values["fit_time_seconds"] > 0
+        assert values["prediction_latency_ms"] > 0
     assert result["predictions"]["overdue_probability"].between(0, 1).all()
     assert set(result["threshold_analysis"]) == {
         "Logistic Regression",
@@ -214,6 +230,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "confusion_matrix_threshold_comparison.png",
         "roc_curve.png",
         "feature_importance.png",
+        "random_forest_n_estimators_curve.png",
         "threshold_tradeoff.png",
     ]:
         assert (output_dir / name).stat().st_size > 0
@@ -265,6 +282,8 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     assert "threshold_tradeoff" not in report["classification"]
     assert "predictions" not in report["regression"]
     assert "threshold_analysis" in report["classification"]
+    assert len(report["classification"]["random_forest_saturation"]) >= 5
+    assert (output_dir / "random_forest_n_estimators_curve.png").is_file()
     assert (output_dir / "classification_predictions.csv").is_file()
     assert (output_dir / "credit_score_predictions.csv").is_file()
 

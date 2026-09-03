@@ -30,6 +30,8 @@ from credit_risk.preprocessing import build_preprocessor
 
 DEFAULT_THRESHOLD = 0.5
 RECALL_FLOORS = [0.80, 0.85, 0.90, 0.95]
+N_ESTIMATOR_VALUES = [25, 50, 100, 200, 300, 500]
+FAST_N_ESTIMATOR_VALUES = [10, 20, 40, 60, 80]
 
 
 def rule_based_predict(row: pd.Series) -> int:
@@ -136,6 +138,47 @@ def _select_recall_scenarios(
     return scenarios
 
 
+def _random_forest_saturation_analysis(
+    forest: Pipeline,
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    cv: StratifiedKFold,
+    best_params: dict[str, object],
+    fast: bool,
+) -> dict[str, dict[str, float]]:
+    """Measure tree-count sensitivity with the selected non-tree settings."""
+    values = FAST_N_ESTIMATOR_VALUES if fast else N_ESTIMATOR_VALUES
+    fixed_params = {
+        "model__max_depth": best_params["model__max_depth"],
+        "model__min_samples_split": best_params["model__min_samples_split"],
+    }
+    saturation = {}
+    for n_estimators in values:
+        candidate = clone(forest).set_params(
+            **fixed_params,
+            model__n_estimators=n_estimators,
+        )
+        scores = cross_validate(
+            candidate,
+            x_train,
+            y_train,
+            scoring={"roc_auc": "roc_auc", "f1": "f1"},
+            cv=cv,
+            n_jobs=-1,
+        )
+        candidate.fit(x_train, y_train)
+        saturation[str(n_estimators)] = {
+            "cv_roc_auc_mean": float(scores["test_roc_auc"].mean()),
+            "cv_roc_auc_std": float(scores["test_roc_auc"].std()),
+            "cv_f1_mean": float(scores["test_f1"].mean()),
+            "fit_time_seconds": float(scores["fit_time"].mean()),
+            "prediction_latency_ms": float(
+                _average_latency_ms(lambda: candidate.predict_proba(x_train))
+            ),
+        }
+    return saturation
+
+
 def train_classification(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
@@ -209,6 +252,14 @@ def train_classification(
     )
     search.fit(x_train, y_train)
     tuned_forest = search.best_estimator_
+    random_forest_saturation = _random_forest_saturation_analysis(
+        forest,
+        x_train,
+        y_train,
+        cv,
+        search.best_params_,
+        fast,
+    )
     tuned_forest_cv_f1 = cross_validate(
         tuned_forest,
         x_train,
@@ -370,6 +421,7 @@ def train_classification(
         "best_params": search.best_params_,
         "best_cv_roc_auc": float(search.best_score_),
         "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),
+        "random_forest_saturation": random_forest_saturation,
         "feature_importance": _feature_importance(tuned_forest),
         "threshold_analysis": threshold_analysis,
         "threshold_tradeoff": {

@@ -133,6 +133,39 @@ def _save_feature_importance(
     plt.close(figure)
 
 
+def _save_random_forest_saturation_curve(
+    saturation: dict[str, dict[str, float]],
+    selected_n_estimators: int,
+    output_path: Path,
+) -> None:
+    values = sorted((int(key), metrics) for key, metrics in saturation.items())
+    n_estimators = [value for value, _ in values]
+    means = [metrics["cv_roc_auc_mean"] for _, metrics in values]
+    stds = [metrics["cv_roc_auc_std"] for _, metrics in values]
+    figure, axis = plt.subplots(figsize=(8, 5))
+    axis.plot(n_estimators, means, marker="o", label="CV ROC-AUC mean")
+    axis.fill_between(
+        n_estimators,
+        np.asarray(means) - np.asarray(stds),
+        np.asarray(means) + np.asarray(stds),
+        alpha=0.2,
+        label="±1 CV standard deviation",
+    )
+    axis.axvline(
+        selected_n_estimators,
+        color="tab:orange",
+        linestyle="--",
+        label=f"GridSearchCV selected: {selected_n_estimators}",
+    )
+    axis.set_xlabel("Number of trees (n_estimators)")
+    axis.set_ylabel("CV ROC-AUC")
+    axis.set_title("Random Forest Tree Count Sensitivity (Train CV)")
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
 def _save_coefficient_paths(
     coefficients: dict[str, dict[str, dict[str, float]]],
     output_path: Path,
@@ -202,6 +235,11 @@ def save_classification_artifacts(
     _save_feature_importance(
         result["feature_importance"],
         destination / "feature_importance.png",
+    )
+    _save_random_forest_saturation_curve(
+        result["random_forest_saturation"],
+        result["best_params"]["model__n_estimators"],
+        destination / "random_forest_n_estimators_curve.png",
     )
     rf_thresholds = result["threshold_analysis"]["Random Forest (Tuned)"]
     tradeoff = result["threshold_tradeoff"]

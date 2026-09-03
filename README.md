@@ -136,6 +136,23 @@ SMOTE 대신 Logistic Regression과 Random Forest에 `class_weight="balanced"`�
 
 Random Forest는 `n_estimators`(100, 200), `max_depth`(None, 8, 16), `min_samples_split`(2, 5)의 12개 조합을 `GridSearchCV(scoring="roc_auc")`로 비교합니다. 이 단계는 연속 risk score를 잘 생성하는 모델을 고르는 과정이며, Test Set은 사용하지 않습니다.
 
+## Random Forest Tree Count Analysis
+
+GridSearchCV와 별도로, 선택된 `max_depth=8`, `min_samples_split=5`를 고정하고 Train Set의 5-fold Stratified CV에서만 tree 수를 비교했습니다. 따라서 이 표는 threshold나 Test Set으로 tree 수를 고른 결과가 아니라, risk ranking 성능과 계산비용의 민감도를 설명하기 위한 분석입니다. `fit time`은 fold당 평균 학습 시간이고 latency는 전체 Train Set 학습 후 Train Set 배치 예측 기준입니다.
+
+| n_estimators | CV ROC-AUC | CV std | CV F1 | Fit time (s) | Prediction latency (ms) |
+|---:|---:|---:|---:|---:|---:|
+| 25 | 0.9446 | 0.0070 | 0.6580 | 0.1391 | 15.6046 |
+| 50 | 0.9456 | 0.0067 | 0.6603 | 0.2929 | 25.3498 |
+| 100 | 0.9461 | 0.0072 | 0.6603 | 0.5931 | 36.4668 |
+| 200 | 0.9468 | 0.0068 | 0.6662 | 1.0719 | 67.2733 |
+| 300 | 0.9470 | 0.0064 | 0.6638 | 1.9079 | 94.4323 |
+| 500 | 0.9470 | 0.0065 | 0.6667 | 3.0725 | 165.1631 |
+
+![Random Forest tree count sensitivity](artifacts/random_forest_n_estimators_curve.png)
+
+이 데이터와 현재 고정 설정에서는 100→200개에서 ROC-AUC가 `+0.0007` 상승하지만, 200→300은 `+0.0001`, 300→500은 `+0.0001` 미만입니다. 반면 fit time은 200개에서 500개로 약 2.9배, batch prediction latency는 약 2.5배 증가합니다. 따라서 약 200개부터 성능 개선폭이 작아지는 구간으로 보이며, 현재 선택된 200개는 이 데이터에서 성능과 비용의 합리적인 균형입니다. 이는 Random Forest 일반의 수렴 법칙이 아니라 본 데이터와 현재 hyperparameter 설정에 한정된 관찰입니다.
+
 ## Decision Threshold
 
 모든 ML 모델은 기본 정책 `threshold=0.5`를 유지합니다. F1 최대 threshold는 비교/reference이고 운영 기준이 아닙니다. `0.80`, `0.85`, `0.90`, `0.95` Recall floor별 threshold는 같은 Train Set의 5-fold out-of-fold score에서만 선택합니다. 각 floor에서 `Recall >= floor` 후보 중 Precision이 최대인 threshold를 택하며, Test Set은 선택이 끝난 정책의 holdout 성능을 한 번 비교하는 데만 사용합니다. ROC-AUC는 연속 score로 계산하므로 scenario 간 동일합니다.
@@ -231,6 +248,7 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 | `artifacts/confusion_matrix_threshold_comparison.png` | 기본·CV tuned threshold의 TP/FP/FN/TN 비교 |
 | `artifacts/roc_curve.png` | 규칙·ML 모델 ROC-AUC 비교 |
 | `artifacts/threshold_tradeoff.png` | Tuned Random Forest Train OOF score의 threshold별 Precision/Recall/F1 |
+| `artifacts/random_forest_n_estimators_curve.png` | 고정된 depth/split에서 tree 수별 Train CV ROC-AUC 및 표준편차 |
 | `artifacts/feature_importance.png` | 튜닝 Forest 특성 중요도 |
 | `artifacts/regularization_coefficients.png` | Ridge/Lasso Alpha별 계수 변화 |
 
