@@ -25,7 +25,18 @@ uv run python -m pytest -v
 - 회귀: 리지·라쏘의 alpha 민감도와 holdout RMSE·MAE·R²
 - 평가: 고정 80:20 학습·테스트 분할, 학습 데이터 내부 5-fold CV, Pipeline 내부 중앙값 대치와 스케일링
 
-로지스틱 회귀는 최신 holdout에서 ROC-AUC와 F1이 가장 높았고, 튜닝 랜덤 포레스트는 비선형 모델의 비교 대상으로 유지합니다. 정확한 재생성 결과는 [artifacts/metrics.json](artifacts/metrics.json), 실험 설계와 해석은 [docs/model_selection.md](docs/model_selection.md)에서 확인합니다.
+로지스틱 회귀는 학습 5-fold CV ROC-AUC가 가장 높고 단순하여 선택했으며, 튜닝 랜덤 포레스트는 비선형 모델의 비교 대상으로 유지합니다.
+
+## 주요 분류 결과
+
+| Model | Accuracy | F1 | ROC-AUC |
+| --- | ---: | ---: | ---: |
+| Rule Baseline | 0.7725 | 0.4752 | 0.8096 |
+| Logistic Regression | 0.8735 | 0.6274 | 0.9505 |
+| Random Forest | 0.9095 | 0.5820 | 0.9376 |
+| Random Forest (Tuned) | 0.8845 | 0.6351 | 0.9410 |
+
+상세 CV·threshold·hyperparameter 결과는 [model_selection.md](docs/model_selection.md)와 [metrics.json](artifacts/metrics.json)을 참조합니다.
 
 ## 프로젝트 구조
 
