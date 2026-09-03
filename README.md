@@ -87,10 +87,10 @@ python -m pytest -v
 
 | 모델 | Accuracy | Precision | Recall | F1-Score | ROC-AUC | 예측 지연시간(ms) |
 |---|---:|---:|---:|---:|---:|---:|
-| 규칙 기반 | 0.7725 | 0.3285 | 0.8583 | 0.4752 | 0.8096 | 14.3352 |
-| Logistic Regression | 0.8785 | 0.4965 | **0.8750** | **0.6335** | **0.9505** | **2.7185** |
-| Random Forest | **0.9095** | **0.6528** | 0.5250 | 0.5820 | 0.9376 | 44.4808 |
-| Random Forest (튜닝) | 0.8840 | 0.5102 | 0.8333 | 0.6329 | 0.9409 | 56.2024 |
+| 규칙 기반 | 0.7725 | 0.3285 | 0.8583 | 0.4752 | 0.8096 | 30.1757 |
+| Logistic Regression | 0.8785 | 0.4965 | **0.8750** | **0.6335** | **0.9505** | **8.1103** |
+| Random Forest | **0.9095** | **0.6528** | 0.5250 | 0.5820 | 0.9376 | 50.2301 |
+| Random Forest (튜닝) | 0.8840 | 0.5102 | 0.8333 | 0.6329 | 0.9409 | 66.4681 |
 
 Logistic Regression은 규칙 기반보다 F1-Score가 약 33.3%, ROC-AUC가 약 17.4% 향상되었습니다. Accuracy만 보면 기본 Random Forest가 가장 높지만 연체 Recall이 0.5250으로 낮아, 연체 고객을 정상으로 놓치는 비용이 큰 신용 심사에는 부적합합니다.
 
@@ -163,6 +163,8 @@ F1-optimal은 F1을 0.6335에서 0.6906으로 높였지만 FN도 30건에서 57�
 
 ![Tuned Random Forest threshold trade-off](artifacts/threshold_tradeoff.png)
 
+`threshold_tradeoff.png`는 Test Set을 훑지 않습니다. Tuned Random Forest의 Train Set 5-fold out-of-fold risk score로 Precision, Recall, F1의 threshold별 변화를 그리며, Test Set은 위 표의 최종 정책 평가에만 사용합니다.
+
 ## FP / FN Interpretation
 
 - False Positive: 실제 정상 고객을 고위험으로 분류하는 오류입니다. 불필요한 추가 심사, 승인 지연, 우량 고객 이탈 또는 영업 기회비용으로 이어질 수 있습니다.
@@ -210,7 +212,7 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 
 ## 운영 모델과 임계값
 
-최종 운영 후보는 Recall-constrained Logistic Regression입니다. Tuned RF보다 운영 정책 F1(0.6319 vs. 0.6037)과 ROC-AUC(0.9505 vs. 0.9409)가 높고, Test batch prediction latency도 2.7185ms로 56.2024ms보다 훨씬 낮습니다. 선형 모델은 구조와 설명도 더 단순합니다. Holdout Test의 Recall은 각각 0.8833과 0.8917로 CV의 90% 제약과 차이가 날 수 있으므로, 실제 운영 전에는 독립 검증 기간에서도 이 기준을 재확인해야 합니다.
+최종 운영 후보는 Recall-constrained Logistic Regression입니다. Tuned RF보다 운영 정책 F1(0.6319 vs. 0.6037)과 ROC-AUC(0.9505 vs. 0.9409)가 높고, Test batch prediction latency도 8.1103ms로 66.4681ms보다 훨씬 낮습니다. 선형 모델은 구조와 설명도 더 단순합니다. Holdout Test의 Recall은 각각 0.8833과 0.8917로 CV의 90% 제약과 차이가 날 수 있으므로, 실제 운영 전에는 독립 검증 기간에서도 이 기준을 재확인해야 합니다.
 
 ## 산출물
 
@@ -230,7 +232,7 @@ Alpha 선택은 Train Set 내부 5-fold CV 평균 RMSE만으로 수행했습니�
 | `artifacts/confusion_matrix.png` | Logistic/튜닝 Forest 오분류 비교 |
 | `artifacts/confusion_matrix_threshold_comparison.png` | 기본·CV tuned threshold의 TP/FP/FN/TN 비교 |
 | `artifacts/roc_curve.png` | 규칙·ML 모델 ROC-AUC 비교 |
-| `artifacts/threshold_tradeoff.png` | Tuned Random Forest의 threshold별 Precision/Recall/F1 |
+| `artifacts/threshold_tradeoff.png` | Tuned Random Forest Train OOF score의 threshold별 Precision/Recall/F1 |
 | `artifacts/feature_importance.png` | 튜닝 Forest 특성 중요도 |
 | `artifacts/regularization_coefficients.png` | Ridge/Lasso Alpha별 계수 변화 |
 

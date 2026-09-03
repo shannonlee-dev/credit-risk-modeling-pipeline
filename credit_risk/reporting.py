@@ -81,11 +81,11 @@ def _save_threshold_tradeoff(
         optimized_threshold,
         color="tab:red",
         linestyle="--",
-        label="CV-tuned threshold",
+        label="Recall-constrained threshold",
     )
     axis.set_xlabel("Decision threshold")
     axis.set_ylabel("Metric")
-    axis.set_title("Tuned Random Forest Threshold Trade-off")
+    axis.set_title("Tuned Random Forest Threshold Trade-off (Train OOF)")
     axis.legend()
     figure.tight_layout()
     figure.savefig(output_path, dpi=150)
@@ -193,9 +193,10 @@ def save_classification_artifacts(
         destination / "feature_importance.png",
     )
     rf_thresholds = result["threshold_analysis"]["Random Forest (Tuned)"]
+    tradeoff = result["threshold_tradeoff"]
     _save_threshold_tradeoff(
-        y_test,
-        table["overdue_probability"].to_numpy(),
+        tradeoff["target"],
+        tradeoff["scores"],
         rf_thresholds["default_threshold"],
         rf_thresholds["optimized_threshold"],
         destination / "threshold_tradeoff.png",
@@ -235,7 +236,7 @@ def metrics_report(result: dict) -> dict:
         "classification": {
             key: value
             for key, value in result["classification"].items()
-            if key != "predictions"
+            if key not in {"predictions", "threshold_tradeoff"}
         },
         "regression": {
             key: value

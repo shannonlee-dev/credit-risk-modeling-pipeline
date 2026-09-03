@@ -194,6 +194,9 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "tuned_rf_prediction_default",
         "tuned_rf_prediction_tuned",
     } <= set(result["predictions"])
+    tradeoff = result["threshold_tradeoff"]
+    assert tradeoff["target"].tolist() == y_train.tolist()
+    assert len(tradeoff["scores"]) == len(y_train)
     assert (output_dir / "classification_predictions.csv").is_file()
     for name in [
         "confusion_matrix.png",
@@ -248,6 +251,7 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     assert set(result["data_distribution"]) == {"all", "train", "test"}
     report = json.loads((output_dir / "metrics.json").read_text(encoding="utf-8"))
     assert "predictions" not in report["classification"]
+    assert "threshold_tradeoff" not in report["classification"]
     assert "predictions" not in report["regression"]
     assert "threshold_analysis" in report["classification"]
     assert (output_dir / "classification_predictions.csv").is_file()

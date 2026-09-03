@@ -19,6 +19,7 @@ from sklearn.model_selection import (
     GridSearchCV,
     StratifiedKFold,
     TunedThresholdClassifierCV,
+    cross_val_predict,
     cross_validate,
 )
 from sklearn.pipeline import Pipeline
@@ -215,6 +216,14 @@ def train_classification(
     tuned_forest_threshold = _tune_threshold(
         tuned_forest, x_train, y_train, cv, operating_scorer
     )
+    tuned_forest_oof_scores = cross_val_predict(
+        tuned_forest,
+        x_train,
+        y_train,
+        cv=cv,
+        method="predict_proba",
+        n_jobs=-1,
+    )[:, 1]
 
     rule_predictions = x_test.apply(rule_based_predict, axis=1).to_numpy()
     logistic_scores = logistic.predict_proba(x_test)[:, 1]
@@ -341,5 +350,9 @@ def train_classification(
         "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),
         "feature_importance": _feature_importance(tuned_forest),
         "threshold_analysis": threshold_analysis,
+        "threshold_tradeoff": {
+            "target": y_train.to_numpy(),
+            "scores": tuned_forest_oof_scores,
+        },
         "predictions": prediction_table,
     }
