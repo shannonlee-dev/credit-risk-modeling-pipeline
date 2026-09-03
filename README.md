@@ -69,7 +69,7 @@ Tuned Random Forest는 `n_estimators=100` 설정에서 Logistic과 비슷한 OOF
 
 ![Tuned Random Forest Train OOF threshold sweep](artifacts/random_forest_threshold_sweep.png)
 
-Tuned Random Forest는 `n_estimators=100`을 선택했습니다. 200개로 늘리면 Train 5-fold CV ROC-AUC가 `0.948000 → 0.948212`로 `0.000212`만 상승하고 F1은 오히려 `0.656051 → 0.655971`로 소폭 낮아졌습니다. 같은 실행의 2,000건 배치 기준으로 CV 폴드당 평균 학습시간은 `0.801초 → 1.626초`, 예측시간은 `35.40ms → 74.96ms`가 됩니다. 트리 수와 모델 저장 공간도 대체로 두 배가 되므로, 이 작은 ROC-AUC 차이보다 비용 효율을 우선해 100개를 사용합니다. 이 batch 벤치마크는 하드웨어·부하·`n_jobs`에 의존하며 실제 단건 서비스 지연시간으로 해석하지 않습니다.
+Tuned Random Forest는 `n_estimators=100`을 선택했습니다. 200개로 늘리면 Train 5-fold CV ROC-AUC가 `0.948000 → 0.948212`로 `0.000212`만 상승하고 F1은 오히려 `0.656051 → 0.655971`로 소폭 낮아졌습니다. 트리 수와 모델 저장 공간도 대체로 두 배가 되므로, 이 작은 ROC-AUC 차이보다 비용 효율을 우선해 100개를 사용합니다. 학습·배치 예측 시간은 환경에 따라 달라지므로 [`metrics.json`](artifacts/metrics.json)의 `benchmark` 구역만 기준으로 삼으며, 실제 단건 서비스 지연시간으로 해석하지 않습니다.
 
 ![랜덤 포레스트 트리 수 민감도](artifacts/random_forest_n_estimators_curve.png)
 
@@ -99,3 +99,11 @@ tests/                         # 동작 중심 회귀 테스트
 - 가상 데이터로는 실제 신용 의사결정이나 실제 신청자 집단에 대한 주장을 뒷받침할 수 없습니다.
 - 확률 보정, 비용 행렬, 심사 역량 제약, 공정성 분석, 시간 기준 검증은 포함하지 않습니다.
 - threshold `0.45`는 이 가상 데이터의 Train OOF sweep과 FN 우선 비용 가정에 따른 선택이며, 실제 운영 전에는 비용·심사 역량·공정성 검증이 필요합니다.
+
+## 앙상블 모델 해석
+
+Random Forest는 여러 트리의 예측을 결합해 단일 트리의 분산을 낮추고 비선형 상호작용을 포착할 수 있습니다. 다만 이 가상 데이터의 위험 구조는 비교적 선형적이어서, Train 5-fold CV ROC-AUC는 Logistic `0.9539`, Tuned RF `0.9480`이었습니다. 비슷한 OOF Recall 조건에서도 Logistic의 F1이 `0.6058`로 RF의 `0.5890`보다 높아, 더 단순한 Logistic을 최종 모델로 선택했습니다.
+
+## 불균형 처리 선택
+
+양성(연체) 비율이 약 12%이므로 학습 시 `class_weight="balanced"`로 소수 클래스 오류에 더 큰 가중치를 부여했습니다. 이는 표본을 복제·합성하지 않는 방식이며, SMOTE는 소수 클래스 경계를 보강할 수 있지만 합성 표본이 과적합을 유발할 수 있습니다. 두 방법 모두 학습 데이터와 CV의 학습 폴드에만 적용해야 하며, 검증·테스트 데이터는 원래 분포를 유지해야 실제 운영 성능을 공정하게 평가할 수 있습니다.

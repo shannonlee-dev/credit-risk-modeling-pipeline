@@ -138,7 +138,7 @@ def _save_random_forest_saturation_curve(
         selected_n_estimators,
         color="tab:orange",
         linestyle="--",
-        label=f"GridSearchCV selected: {selected_n_estimators}",
+        label=f"Cost/performance selected: {selected_n_estimators}",
     )
     axis.set_xlabel("Number of trees (n_estimators)")
     axis.set_ylabel("CV ROC-AUC")
