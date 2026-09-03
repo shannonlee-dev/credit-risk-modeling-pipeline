@@ -11,14 +11,12 @@ from sklearn.metrics import (
     accuracy_score,
     f1_score,
     precision_score,
-    precision_recall_curve,
     recall_score,
     roc_auc_score,
 )
 from sklearn.model_selection import (
     GridSearchCV,
     StratifiedKFold,
-    TunedThresholdClassifierCV,
     cross_val_predict,
     cross_validate,
 )
@@ -29,7 +27,7 @@ from credit_risk.preprocessing import build_preprocessor
 
 
 DEFAULT_THRESHOLD = 0.5
-RECALL_FLOORS = [0.80, 0.85, 0.90, 0.95]
+SWEEP_THRESHOLDS = np.linspace(0.30, 0.60, 31)
 LOGISTIC_C_VALUES = [0.001, 0.003, 0.01, 0.03, 0.1]
 N_ESTIMATOR_VALUES = [25, 50, 100, 200, 300, 500]
 RF_MAX_DEPTH_VALUES = [8]
@@ -106,43 +104,32 @@ def _feature_importance(model: Pipeline) -> dict[str, float]:
     }
 
 
-def _tune_threshold(
-    model: Pipeline,
-    x_train: pd.DataFrame,
-    y_train: pd.Series,
-    cv: StratifiedKFold,
-    scoring: str | object,
-) -> float:
-    """Select an F1-maximizing operating threshold using training CV only."""
-    tuner = TunedThresholdClassifierCV(
-        estimator=clone(model),
-        scoring=scoring,
-        cv=cv,
-        random_state=RANDOM_STATE,
-    )
-    tuner.fit(x_train, y_train)
-    return float(tuner.best_threshold_)
-
-
-def _select_recall_scenarios(
+def _threshold_sweep(
     y_train: pd.Series,
     oof_scores: np.ndarray,
-) -> dict[str, dict[str, float | str]]:
-    """Select maximum-precision thresholds at recall floors from Train OOF scores."""
-    precision, recall, thresholds = precision_recall_curve(y_train, oof_scores)
-    scenarios = {}
-    for floor in RECALL_FLOORS:
-        candidates = np.flatnonzero(recall[:-1] >= floor)
-        best_precision = precision[candidates].max()
-        best_threshold = thresholds[
-            candidates[precision[candidates] == best_precision]
-        ].max()
-        scenarios[f"{floor:.2f}"] = {
-            "threshold": float(best_threshold),
-            "cv_recall_floor": float(floor),
-            "selection_policy": "maximize_precision_at_recall_floor",
-        }
-    return scenarios
+) -> pd.DataFrame:
+    """Summarize Logistic Train-OOF outcomes without selecting a threshold."""
+    y_values = y_train.to_numpy()
+    rows = []
+    for raw_threshold in SWEEP_THRESHOLDS:
+        threshold = float(np.round(raw_threshold, 2))
+        predictions = oof_scores >= threshold
+        rows.append(
+            {
+                "threshold": threshold,
+                "is_baseline": threshold == DEFAULT_THRESHOLD,
+                "predicted_overdue": int(predictions.sum()),
+                "tp": int(np.sum((y_values == 1) & predictions)),
+                "fp": int(np.sum((y_values == 0) & predictions)),
+                "fn": int(np.sum((y_values == 1) & ~predictions)),
+                "precision": float(
+                    precision_score(y_train, predictions, zero_division=0)
+                ),
+                "recall": float(recall_score(y_train, predictions, zero_division=0)),
+                "f1": float(f1_score(y_train, predictions, zero_division=0)),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def _random_forest_saturation_analysis(
@@ -305,12 +292,6 @@ def train_classification(
         n_jobs=-1,
     )
 
-    logistic_f1_threshold = _tune_threshold(
-        logistic, x_train, y_train, cv, "f1"
-    )
-    tuned_forest_f1_threshold = _tune_threshold(
-        tuned_forest, x_train, y_train, cv, "f1"
-    )
     logistic_oof_scores = cross_val_predict(
         logistic,
         x_train,
@@ -319,20 +300,7 @@ def train_classification(
         method="predict_proba",
         n_jobs=-1,
     )[:, 1]
-    logistic_recall_scenarios = _select_recall_scenarios(
-        y_train, logistic_oof_scores
-    )
-    tuned_forest_oof_scores = cross_val_predict(
-        tuned_forest,
-        x_train,
-        y_train,
-        cv=cv,
-        method="predict_proba",
-        n_jobs=-1,
-    )[:, 1]
-    tuned_forest_recall_scenarios = _select_recall_scenarios(
-        y_train, tuned_forest_oof_scores
-    )
+    threshold_sweep = _threshold_sweep(y_train, logistic_oof_scores)
 
     rule_predictions = x_test.apply(rule_based_predict, axis=1).to_numpy()
     logistic_scores = logistic.predict_proba(x_test)[:, 1]
@@ -341,16 +309,6 @@ def train_classification(
     logistic_predictions = (logistic_scores >= DEFAULT_THRESHOLD).astype(int)
     forest_predictions = (forest_scores >= DEFAULT_THRESHOLD).astype(int)
     tuned_predictions = (tuned_scores >= DEFAULT_THRESHOLD).astype(int)
-    logistic_illustrative_recall_090_predictions = (
-        logistic_scores >= logistic_recall_scenarios["0.90"]["threshold"]
-    ).astype(int)
-    logistic_f1_predictions = (logistic_scores >= logistic_f1_threshold).astype(int)
-    tuned_forest_illustrative_recall_090_predictions = (
-        tuned_scores >= tuned_forest_recall_scenarios["0.90"]["threshold"]
-    ).astype(int)
-    tuned_forest_f1_predictions = (
-        tuned_scores >= tuned_forest_f1_threshold
-    ).astype(int)
 
     latencies = {
         "Rule Baseline": _average_latency_ms(
@@ -387,71 +345,15 @@ def train_classification(
         )
         for name in predictions
     }
-    def build_threshold_analysis(
-        default_predictions: np.ndarray,
-        model_scores: np.ndarray,
-        f1_threshold: float,
-        f1_predictions: np.ndarray,
-        recall_scenarios: dict[str, dict[str, float | str]],
-        latency: float,
-    ) -> dict:
-        scenarios = {}
-        for floor, scenario in recall_scenarios.items():
-            threshold = float(scenario["threshold"])
-            scenario_predictions = (model_scores >= threshold).astype(int)
-            scenarios[floor] = {
-                **scenario,
-                "test_metrics": evaluate_classifier(
-                    y_test, scenario_predictions, model_scores, latency
-                ),
-            }
-        return {
-            "default_threshold": DEFAULT_THRESHOLD,
-            "default_metrics": evaluate_classifier(
-                y_test, default_predictions, model_scores, latency
-            ),
-            "f1_reference": {
-                "threshold": f1_threshold,
-                "metrics": evaluate_classifier(
-                    y_test, f1_predictions, model_scores, latency
-                ),
-            },
-            "recall_scenarios": scenarios,
-        }
-
-    threshold_analysis = {
-        "Logistic Regression": build_threshold_analysis(
-            logistic_predictions,
-            logistic_scores,
-            logistic_f1_threshold,
-            logistic_f1_predictions,
-            logistic_recall_scenarios,
-            latencies["Logistic Regression"],
-        ),
-        "Random Forest (Tuned)": build_threshold_analysis(
-            tuned_predictions,
-            tuned_scores,
-            tuned_forest_f1_threshold,
-            tuned_forest_f1_predictions,
-            tuned_forest_recall_scenarios,
-            latencies["Random Forest (Tuned)"],
-        ),
-    }
     prediction_table = pd.DataFrame(
         {
             "actual_is_overdue": y_test.to_numpy(),
             "rule_prediction": rule_predictions,
             "logistic_probability": logistic_scores,
             "logistic_prediction_default": logistic_predictions,
-            "logistic_prediction_illustrative_recall_090": (
-                logistic_illustrative_recall_090_predictions
-            ),
             "random_forest_probability": forest_scores,
             "overdue_probability": tuned_scores,
             "tuned_rf_prediction_default": tuned_predictions,
-            "tuned_rf_prediction_illustrative_recall_090": (
-                tuned_forest_illustrative_recall_090_predictions
-            ),
         }
     )
     return {
@@ -472,11 +374,7 @@ def train_classification(
         ),
         "random_forest_saturation": random_forest_saturation,
         "feature_importance": _feature_importance(tuned_forest),
-        "threshold_analysis": threshold_analysis,
-        "threshold_tradeoff": {
-            "target": y_train.to_numpy(),
-            "scores": tuned_forest_oof_scores,
-        },
+        "threshold_sweep": threshold_sweep,
         "latency_benchmark": {
             "source": "training_feature_batch",
             "batch_rows": len(latency_batch),

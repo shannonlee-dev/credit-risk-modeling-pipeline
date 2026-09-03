@@ -17,9 +17,6 @@ import seaborn as sns
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     RocCurveDisplay,
-    f1_score,
-    precision_score,
-    recall_score,
 )
 
 matplotlib.use("Agg")
@@ -51,48 +48,20 @@ def _save_confusion_matrices(
     plt.close(figure)
 
 
-def _save_threshold_tradeoff(
-    y_train: np.ndarray,
-    scores: np.ndarray,
-    default_threshold: float,
-    f1_threshold: float,
-    recall_scenarios: dict[str, dict],
-    output_path: Path,
-) -> None:
-    thresholds = np.linspace(0, 1, 101)
-    metrics = {
-        "Precision": [
-            precision_score(y_train, scores >= threshold, zero_division=0)
-            for threshold in thresholds
-        ],
-        "Recall": [
-            recall_score(y_train, scores >= threshold, zero_division=0)
-            for threshold in thresholds
-        ],
-        "F1": [
-            f1_score(y_train, scores >= threshold, zero_division=0)
-            for threshold in thresholds
-        ],
-    }
+def _save_threshold_sweep(sweep: pd.DataFrame, output_path: Path) -> None:
     figure, axis = plt.subplots(figsize=(8, 5))
-    for name, values in metrics.items():
-        axis.plot(thresholds, values, label=name)
-    axis.axvline(default_threshold, color="black", linestyle="--", label="Default 0.5")
-    axis.axvline(
-        f1_threshold,
-        color="tab:purple",
-        linestyle="--",
-        label="F1 reference",
-    )
-    for floor, scenario in recall_scenarios.items():
-        axis.axvline(
-            scenario["threshold"],
-            linestyle=":",
-            label=f"Recall ≥ {floor} CV",
+    for metric in ["precision", "recall", "f1"]:
+        axis.plot(
+            sweep["threshold"],
+            sweep[metric],
+            marker="o",
+            markersize=3,
+            label=metric.capitalize(),
         )
+    axis.axvline(0.50, color="black", linestyle="--", label="Baseline 0.50")
     axis.set_xlabel("Decision threshold")
-    axis.set_ylabel("Metric")
-    axis.set_title("Tuned Random Forest Threshold Trade-off (Train OOF)")
+    axis.set_ylabel("OOF metric")
+    axis.set_title("Logistic Regression Threshold Sweep (Train OOF)")
     axis.legend()
     figure.tight_layout()
     figure.savefig(output_path, dpi=150)
@@ -166,41 +135,6 @@ def _save_random_forest_saturation_curve(
     plt.close(figure)
 
 
-def _save_logistic_c_curve(
-    analysis: dict[str, dict[str, float]],
-    selected_c: float,
-    output_path: Path,
-) -> None:
-    """Plot Train-CV ROC-AUC across logistic regularization candidates."""
-    values = sorted((float(c_value), metrics) for c_value, metrics in analysis.items())
-    c_values = [value for value, _ in values]
-    means = [metrics["cv_roc_auc_mean"] for _, metrics in values]
-    stds = [metrics["cv_roc_auc_std"] for _, metrics in values]
-    figure, axis = plt.subplots(figsize=(8, 5))
-    axis.plot(c_values, means, marker="o", label="CV ROC-AUC mean")
-    axis.fill_between(
-        c_values,
-        np.asarray(means) - np.asarray(stds),
-        np.asarray(means) + np.asarray(stds),
-        alpha=0.2,
-        label="±1 CV standard deviation",
-    )
-    axis.axvline(
-        selected_c,
-        color="tab:orange",
-        linestyle="--",
-        label=f"Selected C: {selected_c:g}",
-    )
-    axis.set_xscale("log")
-    axis.set_xlabel("Regularization inverse strength (C)")
-    axis.set_ylabel("CV ROC-AUC")
-    axis.set_title("Logistic Regression C Selection (Train CV)")
-    axis.legend()
-    figure.tight_layout()
-    figure.savefig(output_path, dpi=150)
-    plt.close(figure)
-
-
 def _save_coefficient_paths(
     coefficients: dict[str, dict[str, dict[str, float]]],
     output_path: Path,
@@ -238,24 +172,14 @@ def save_classification_artifacts(
     _save_confusion_matrices(
         y_test,
         {
-            "Logistic Regression (0.5)": table["logistic_prediction_default"].to_numpy(),
-            "Random Forest (Tuned, 0.5)": table["tuned_rf_prediction_default"].to_numpy(),
+            "Logistic Regression (0.50 baseline)": table[
+                "logistic_prediction_default"
+            ].to_numpy(),
+            "Random Forest (Tuned, 0.50 baseline)": table[
+                "tuned_rf_prediction_default"
+            ].to_numpy(),
         },
         destination / "confusion_matrix.png",
-    )
-    _save_confusion_matrices(
-        y_test,
-        {
-            "Logistic (0.5)": table["logistic_prediction_default"].to_numpy(),
-            "Logistic (Recall ≥ 0.90 CV, illustrative)": table[
-                "logistic_prediction_illustrative_recall_090"
-            ].to_numpy(),
-            "Tuned RF (0.5)": table["tuned_rf_prediction_default"].to_numpy(),
-            "Tuned RF (Recall ≥ 0.90 CV, illustrative)": table[
-                "tuned_rf_prediction_illustrative_recall_090"
-            ].to_numpy(),
-        },
-        destination / "confusion_matrix_threshold_comparison.png",
     )
     _save_roc_curves(
         y_test,
@@ -276,20 +200,14 @@ def save_classification_artifacts(
         result["best_params"]["model__n_estimators"],
         destination / "random_forest_n_estimators_curve.png",
     )
-    _save_logistic_c_curve(
-        result["logistic_c_analysis"],
-        result["selected_logistic_c"],
-        destination / "logistic_c_curve.png",
+    result["threshold_sweep"].to_csv(
+        destination / "threshold_sweep.csv",
+        index=False,
+        float_format="%.6f",
     )
-    rf_thresholds = result["threshold_analysis"]["Random Forest (Tuned)"]
-    tradeoff = result["threshold_tradeoff"]
-    _save_threshold_tradeoff(
-        tradeoff["target"],
-        tradeoff["scores"],
-        rf_thresholds["default_threshold"],
-        rf_thresholds["f1_reference"]["threshold"],
-        rf_thresholds["recall_scenarios"],
-        destination / "threshold_tradeoff.png",
+    _save_threshold_sweep(
+        result["threshold_sweep"],
+        destination / "threshold_sweep.png",
     )
     table.to_csv(destination / "classification_predictions.csv", index=False)
 
@@ -319,19 +237,49 @@ def save_regression_artifacts(
     )
 
 
+def _without_timing(value):
+    if isinstance(value, dict):
+        return {
+            key: _without_timing(child)
+            for key, child in value.items()
+            if key not in {"batch_prediction_latency_ms", "fit_time_seconds"}
+        }
+    if isinstance(value, list):
+        return [_without_timing(child) for child in value]
+    return value
+
+
 def metrics_report(result: dict) -> dict:
-    """Remove non-serializable prediction objects from the report."""
+    """Serialize stable evaluation data and one benchmark summary."""
+    classification = result["classification"]
+    saturation = classification["random_forest_saturation"]
     return {
         "data_distribution": result["data_distribution"],
-        "classification": {
+        "classification": _without_timing({
             key: value
-            for key, value in result["classification"].items()
-            if key not in {"predictions", "threshold_tradeoff"}
-        },
+            for key, value in classification.items()
+            if key not in {"predictions", "threshold_sweep", "latency_benchmark"}
+        }),
         "regression": {
             key: value
             for key, value in result["regression"].items()
             if key != "predictions"
+        },
+        "benchmark": {
+            **classification["latency_benchmark"],
+            "model_prediction_latency_ms": {
+                name: metrics["batch_prediction_latency_ms"]
+                for name, metrics in classification["metrics"].items()
+            },
+            "random_forest_tree_count": {
+                n_estimators: {
+                    "fit_time_seconds": values["fit_time_seconds"],
+                    "batch_prediction_latency_ms": values[
+                        "batch_prediction_latency_ms"
+                    ],
+                }
+                for n_estimators, values in saturation.items()
+            },
         },
     }
 

@@ -13,17 +13,15 @@
 
 ## 분류 결과
 
-커밋된 [지표 기록](../artifacts/metrics.json)이 수치의 기준 기록입니다. 현재의 결정적 가상 데이터에서는 로지스틱 회귀가 holdout ROC-AUC와 F1에서 가장 높습니다. 이는 가상 결과가 대체로 선형적인 소득·부채·연체 횟수 신호에 의해 생성되기 때문이며, 일반적으로 선형 모델을 선호해야 한다는 뜻은 아닙니다.
+커밋된 [지표 기록](../artifacts/metrics.json)이 수치의 기준 기록입니다. 현재의 결정적 가상 데이터에서 로지스틱 회귀는 holdout ROC-AUC가 가장 높고, Tuned RF는 F1이 조금 높습니다. 기본 모델 선택은 holdout 결과가 아니라 학습 5-fold CV ROC-AUC와 단순성을 기준으로 합니다. 이는 가상 결과가 대체로 선형적인 소득·부채·연체 횟수 신호에 의해 생성되기 때문이며, 일반적으로 선형 모델을 선호해야 한다는 뜻은 아닙니다.
 
 규칙 기반 모델은 해석 가능한 기준선으로 유지합니다. 이진 출력으로도 AUC를 구할 수 있지만, 하나의 거친 운영점에 기반하므로 연속 위험 점수를 내는 모델의 ROC 곡선과 직접 같은 수준으로 비교할 수는 없습니다.
 
 ## 임계값 민감도 분석
 
-로지스틱 회귀와 튜닝된 랜덤 포레스트에서 각 Recall floor(0.80, 0.85, 0.90, 0.95)는 학습 데이터의 5-fold out-of-fold score만으로 선택합니다. OOF Recall이 floor를 만족하는 임계값 중 Precision이 가장 높은 값을 사용합니다. F1 최대 임계값은 선택된 정책이 아니라 비교를 위한 기준값으로만 보존합니다.
+운영 threshold는 자동으로 선택하지 않습니다. 선택된 Logistic Regression의 Train OOF probability만으로 `np.linspace(0.30, 0.60, 31)`을 평가하고, `0.50`을 baseline으로 표시한 Precision·Recall·F1·TP·FP·FN 표를 만듭니다. Holdout 레이블은 threshold sweep이나 선택에 절대 사용하지 않습니다.
 
-이후 holdout 지표는 미리 선택된 임계값이 얼마나 일반화되는지 보여줍니다. Holdout Recall이 CV floor와 같을 필요는 없습니다. floor는 학습 OOF 성능 추정치의 선택 제약이지 보장값이 아닙니다. `illustrative_recall_090` 예측 열과 confusion matrix 패널은 0.90 결과를 최종 운영 결정이 아닌 하나의 시나리오로 명시합니다.
-
-손실 추정치, 심사 역량, 위험 선호도, 독립적인 시간 기준 검증이 없으므로 어떤 floor도 최적이라고 부르지 않습니다. 임계값 상충 관계 그래프는 holdout을 훑지 않고 학습 OOF score로 계산합니다.
+손실 추정치, 심사 역량, 위험 선호도가 없으므로 최적 threshold를 주장할 수 없습니다. 표와 그래프는 사람이 비용과 운영 제약을 반영해 threshold를 선택하기 위한 근거이며, 선택 후에만 holdout으로 일반화를 평가합니다.
 
 ## 랜덤 포레스트 트리 수 민감도 분석
 
@@ -33,12 +31,16 @@
 
 ## 예측 시간 해석
 
-예측 시간은 간단한 재현성 보조 정보이지 성능 측정 주장이 아닙니다. 모든 분류 모델과 트리 수별 예측 시간은 1회 warm-up 뒤 5회 반복하여, 동일한 최대 2,000행 학습 특성 배치에서 측정합니다. 정확한 값은 배치 메타데이터와 함께 `metrics.json`에만 기록하며, 하드웨어, CPU 부하, 라이브러리 버전, `n_jobs`에 따라 달라질 수 있습니다. 온라인 단건 예측 시간과 비교해서는 안 됩니다.
+예측 시간은 간단한 재현성 보조 정보이지 성능 측정 주장이 아닙니다. 모든 분류 모델과 트리 수별 예측 시간은 1회 warm-up 뒤 5회 반복하여, 동일한 최대 2,000행 학습 특성 배치에서 측정합니다. 정확한 값은 `metrics.json`의 단일 `benchmark` 구역에 기록하며, 하드웨어, CPU 부하, 라이브러리 버전, `n_jobs`에 따라 달라질 수 있습니다. 온라인 단건 예측 시간과 비교해서는 안 됩니다.
 
 ## 산출물
 
-- `artifacts/metrics.json`: 기계가 읽을 수 있는 지표, 선택된 파라미터, 임계값 시나리오, 회귀 기록, 성능 측정 메타데이터
-- `artifacts/*.png`: 현재 결과 기록의 시각적 근거로 커밋되는 그래프
+- `artifacts/metrics.json`: 기계가 읽을 수 있는 지표, 선택된 파라미터, 회귀 기록, 단일 성능 측정 구역
+- `artifacts/confusion_matrix.png`: 0.50 baseline의 FP/FN 비교
+- `artifacts/threshold_sweep.csv`, `threshold_sweep.png`: Logistic Train OOF threshold 후보 표와 그래프
+- `artifacts/roc_curve.png`: 분류 성능 비교
+- `artifacts/random_forest_n_estimators_curve.png`, `feature_importance.png`: 앙상블 선택·해석 근거
+- `artifacts/regularization_coefficients.png`: Ridge/Lasso 규제 강도별 계수 변화
 - Git에서 제외되는 `classification_predictions.csv`, `credit_score_predictions.csv`: 로컬에서 재생성 가능한 행 단위 예측 결과
 
 ## 선택 요약
@@ -47,7 +49,7 @@
 | --- | --- | --- |
 | 분류 모델 | 로지스틱 회귀 | Train 5-fold CV ROC-AUC가 Tuned RF보다 높고 모델이 단순함. Holdout 결과는 선택 후 일반화 성능 확인에 사용 |
 | 랜덤 포레스트 트리 수 | 200 | CV ROC-AUC가 약 200개 이후 포화 |
-| 임계값 정책 | Recall floor 민감도 분석 | 실제 비용 정보가 없어 단일 최적 정책을 주장하지 않음 |
-| 대표 임계값 시나리오 | Recall ≥ 0.90 CV | 0.90→0.95 구간에서 FP 증가 부담 확대 |
+| 임계값 정책 | 사람 검토용 Train OOF sweep | 실제 비용 정보가 없어 단일 최적 정책을 자동 선택하지 않음 |
+| baseline | 0.50 | `0.30~0.60` 후보와 TP·FP·FN 및 Precision·Recall·F1을 비교 |
 | 리지 alpha | 1.0 | 학습 5-fold CV RMSE |
 | 라쏘 alpha | 0.1 | 학습 5-fold CV RMSE |

@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 
+import numpy as np
 import pandas as pd
 import pytest
 from sklearn.compose import ColumnTransformer
@@ -200,43 +201,31 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         assert values["fit_time_seconds"] > 0
         assert values["batch_prediction_latency_ms"] > 0
     assert result["predictions"]["overdue_probability"].between(0, 1).all()
-    assert set(result["threshold_analysis"]) == {
-        "Logistic Regression",
-        "Random Forest (Tuned)",
-    }
-    for analysis in result["threshold_analysis"].values():
-        assert analysis["default_threshold"] == 0.5
-        assert 0 <= analysis["f1_reference"]["threshold"] <= 1
-        assert {
-            "accuracy",
-            "precision",
-            "recall",
-            "f1",
-            "roc_auc",
-            "fn",
-            "fp",
-        } <= analysis["default_metrics"].keys()
-        assert set(analysis["recall_scenarios"]) == {
-            "0.80",
-            "0.85",
-            "0.90",
-            "0.95",
-        }
-        assert analysis["f1_reference"]["metrics"]["f1"] >= 0
-        for floor, scenario in analysis["recall_scenarios"].items():
-            assert 0 <= scenario["threshold"] <= 1
-            assert scenario["cv_recall_floor"] == float(floor)
-            assert scenario["selection_policy"] == "maximize_precision_at_recall_floor"
-            assert scenario["test_metrics"]["fn"] >= 0
-            assert scenario["test_metrics"]["fp"] >= 0
-            assert scenario["test_metrics"]["roc_auc"] == pytest.approx(
-                analysis["default_metrics"]["roc_auc"]
-            )
+    sweep = result["threshold_sweep"]
+    assert list(sweep) == [
+        "threshold",
+        "is_baseline",
+        "predicted_overdue",
+        "tp",
+        "fp",
+        "fn",
+        "precision",
+        "recall",
+        "f1",
+    ]
+    assert sweep["threshold"].tolist() == pytest.approx(
+        np.linspace(0.30, 0.60, 31)
+    )
+    baseline = sweep.loc[sweep["is_baseline"]]
+    assert len(baseline) == 1
+    assert baseline.iloc[0]["threshold"] == 0.50
+    assert (
+        (sweep[["precision", "recall", "f1"]] >= 0)
+        & (sweep[["precision", "recall", "f1"]] <= 1)
+    ).all().all()
     assert {
         "logistic_prediction_default",
-        "logistic_prediction_illustrative_recall_090",
         "tuned_rf_prediction_default",
-        "tuned_rf_prediction_illustrative_recall_090",
     } <= set(result["predictions"])
     latency_benchmark = result["latency_benchmark"]
     assert latency_benchmark == {
@@ -244,20 +233,19 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "repeats": 5,
         "source": "training_feature_batch",
     }
-    tradeoff = result["threshold_tradeoff"]
-    assert tradeoff["target"].tolist() == y_train.tolist()
-    assert len(tradeoff["scores"]) == len(y_train)
     assert (output_dir / "classification_predictions.csv").is_file()
     for name in [
         "confusion_matrix.png",
-        "confusion_matrix_threshold_comparison.png",
         "roc_curve.png",
         "feature_importance.png",
         "random_forest_n_estimators_curve.png",
-        "logistic_c_curve.png",
-        "threshold_tradeoff.png",
+        "threshold_sweep.csv",
+        "threshold_sweep.png",
     ]:
         assert (output_dir / name).stat().st_size > 0
+    assert not (output_dir / "confusion_matrix_threshold_comparison.png").exists()
+    assert not (output_dir / "logistic_c_curve.png").exists()
+    assert not (output_dir / "threshold_tradeoff.png").exists()
 
 
 def test_regression_selects_alpha_and_saves_bounded_predictions(
@@ -303,11 +291,25 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
     assert set(result["data_distribution"]) == {"all", "train", "test"}
     report = json.loads((output_dir / "metrics.json").read_text(encoding="utf-8"))
     assert "predictions" not in report["classification"]
-    assert "threshold_tradeoff" not in report["classification"]
+    assert "threshold_sweep" not in report["classification"]
+    assert "latency_benchmark" not in report["classification"]
     assert "predictions" not in report["regression"]
-    assert "threshold_analysis" in report["classification"]
+    assert "threshold_analysis" not in report["classification"]
+    assert set(report["benchmark"]) == {
+        "source",
+        "batch_rows",
+        "repeats",
+        "model_prediction_latency_ms",
+        "random_forest_tree_count",
+    }
+    assert all(
+        "batch_prediction_latency_ms" not in metrics
+        for metrics in report["classification"]["metrics"].values()
+    )
     assert len(report["classification"]["random_forest_saturation"]) >= 5
     assert (output_dir / "random_forest_n_estimators_curve.png").is_file()
+    assert (output_dir / "threshold_sweep.csv").is_file()
+    assert (output_dir / "threshold_sweep.png").is_file()
     assert (output_dir / "classification_predictions.csv").is_file()
     assert (output_dir / "credit_score_predictions.csv").is_file()
 
