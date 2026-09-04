@@ -169,14 +169,18 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         assert 0 <= values["cv_f1_mean"] <= 1
     assert result["selected_logistic_c"] in {0.001, 0.003, 0.01, 0.03, 0.1}
     assert result["selected_classification_model"] == "Logistic Regression"
-    assert result["best_params"]["model__max_depth"] == 8
+    assert result["best_params"]["model__max_depth"] in {None, 8, 16}
     assert (
         result["best_params"]["model__min_samples_split"]
         in {5, 10, 20, 40, 80}
     )
-    split_analysis = result["random_forest_min_samples_split_analysis"]
-    assert set(split_analysis) == {"5", "10", "20", "40", "80"}
-    for values in split_analysis.values():
+    grid_analysis = result["random_forest_grid_analysis"]
+    assert set(grid_analysis) == {
+        f"max_depth={max_depth}, min_samples_split={min_samples_split}"
+        for max_depth in [None, 8, 16]
+        for min_samples_split in [5, 10, 20, 40, 80]
+    }
+    for values in grid_analysis.values():
         assert 0 <= values["cv_roc_auc_mean"] <= 1
         assert values["cv_roc_auc_std"] >= 0
     saturation = result["random_forest_saturation"]
@@ -381,8 +385,12 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
         "0.1",
     }
     assert set(
-        report["classification"]["random_forest_min_samples_split_analysis"]
-    ) == {"20", "40"}
+        report["classification"]["random_forest_grid_analysis"]
+    ) == {
+        f"max_depth={max_depth}, min_samples_split={min_samples_split}"
+        for max_depth in [None, 8, 16]
+        for min_samples_split in [20, 40]
+    }
     assert set(report["classification"]["random_forest_saturation"]) == {
         "50",
         "100",

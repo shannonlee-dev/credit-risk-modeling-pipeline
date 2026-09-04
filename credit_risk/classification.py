@@ -46,7 +46,7 @@ SELECTED_CLASSIFICATION_MODEL = LOGISTIC_REGRESSION_MODEL
 SWEEP_THRESHOLDS = np.linspace(0.30, 0.60, 31)
 LOGISTIC_C_VALUES = [0.001, 0.003, 0.01, 0.03, 0.1]
 N_ESTIMATOR_VALUES = [25, 50, 100, 200, 300, 500]
-RF_MAX_DEPTH_VALUES = [8]
+RF_MAX_DEPTH_VALUES = [None, 8, 16]
 RF_MIN_SAMPLES_SPLIT_VALUES = [5, 10, 20, 40, 80]
 FAST_LOGISTIC_C_VALUES = [0.01, 0.1]
 FAST_N_ESTIMATOR_VALUES = [50, 100]
@@ -337,8 +337,13 @@ def train_classification(
     )
     search.fit(x_train, y_train)
     tuned_forest = search.best_estimator_
-    random_forest_min_samples_split_analysis = {
-        str(params["model__min_samples_split"]): {
+    random_forest_grid_analysis = {
+        (
+            "max_depth="
+            f"{params['model__max_depth']}, "
+            "min_samples_split="
+            f"{params['model__min_samples_split']}"
+        ): {
             "cv_roc_auc_mean": float(mean_score),
             "cv_roc_auc_std": float(std_score),
         }
@@ -478,9 +483,7 @@ def train_classification(
         "best_params": search.best_params_,
         "best_cv_roc_auc": float(search.best_score_),
         "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),
-        "random_forest_min_samples_split_analysis": (
-            random_forest_min_samples_split_analysis
-        ),
+        "random_forest_grid_analysis": random_forest_grid_analysis,
         "random_forest_saturation": random_forest_saturation,
         "feature_importance": _feature_importance(tuned_forest),
         "logistic_threshold_sweep": threshold_sweep,

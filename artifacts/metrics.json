@@ -111,26 +111,66 @@
     },
     "best_cv_roc_auc": 0.9479998776879629,
     "best_cv_f1": 0.6560512629243445,
-    "random_forest_min_samples_split_analysis": {
-      "5": {
+    "random_forest_grid_analysis": {
+      "max_depth=None, min_samples_split=5": {
+        "cv_roc_auc_mean": 0.9436107527836896,
+        "cv_roc_auc_std": 0.00733606357719754
+      },
+      "max_depth=None, min_samples_split=10": {
+        "cv_roc_auc_mean": 0.9458812258230033,
+        "cv_roc_auc_std": 0.008067379747517194
+      },
+      "max_depth=None, min_samples_split=20": {
+        "cv_roc_auc_mean": 0.9463908666856191,
+        "cv_roc_auc_std": 0.0071993772597083346
+      },
+      "max_depth=None, min_samples_split=40": {
+        "cv_roc_auc_mean": 0.9475588820376556,
+        "cv_roc_auc_std": 0.007398052019042328
+      },
+      "max_depth=None, min_samples_split=80": {
+        "cv_roc_auc_mean": 0.9468513227579848,
+        "cv_roc_auc_std": 0.00785100023893781
+      },
+      "max_depth=8, min_samples_split=5": {
         "cv_roc_auc_mean": 0.9460931644095698,
         "cv_roc_auc_std": 0.007164115428349257
       },
-      "10": {
+      "max_depth=8, min_samples_split=10": {
         "cv_roc_auc_mean": 0.9469854585856142,
         "cv_roc_auc_std": 0.006937327138010818
       },
-      "20": {
+      "max_depth=8, min_samples_split=20": {
         "cv_roc_auc_mean": 0.9473446751555606,
         "cv_roc_auc_std": 0.007381332032903683
       },
-      "40": {
+      "max_depth=8, min_samples_split=40": {
         "cv_roc_auc_mean": 0.9479998776879629,
         "cv_roc_auc_std": 0.006984841460681819
       },
-      "80": {
+      "max_depth=8, min_samples_split=80": {
         "cv_roc_auc_mean": 0.946948864802853,
         "cv_roc_auc_std": 0.00788548972261135
+      },
+      "max_depth=16, min_samples_split=5": {
+        "cv_roc_auc_mean": 0.9436942564816885,
+        "cv_roc_auc_std": 0.009422353644941357
+      },
+      "max_depth=16, min_samples_split=10": {
+        "cv_roc_auc_mean": 0.9451162378066418,
+        "cv_roc_auc_std": 0.008178091535612051
+      },
+      "max_depth=16, min_samples_split=20": {
+        "cv_roc_auc_mean": 0.9465266675395589,
+        "cv_roc_auc_std": 0.00793448496919839
+      },
+      "max_depth=16, min_samples_split=40": {
+        "cv_roc_auc_mean": 0.9474548222904657,
+        "cv_roc_auc_std": 0.0074923356571022824
+      },
+      "max_depth=16, min_samples_split=80": {
+        "cv_roc_auc_mean": 0.9468513227579848,
+        "cv_roc_auc_std": 0.00785100023893781
       }
     },
     "random_forest_saturation": {
@@ -299,35 +339,35 @@
     "batch_rows": 2000,
     "repeats": 5,
     "model_prediction_latency_ms": {
-      "Rule Baseline": 13.630266600011964,
-      "Logistic Regression": 2.5156676000051448,
-      "Random Forest": 41.23671219999778,
-      "Random Forest (Tuned)": 36.846159599986095
+      "Rule Baseline": 14.46002499997121,
+      "Logistic Regression": 1.8463017999238218,
+      "Random Forest": 36.463707400071144,
+      "Random Forest (Tuned)": 37.04965279994212
     },
     "random_forest_tree_count": {
       "25": {
-        "fit_time_seconds": 0.13790631294250488,
-        "batch_prediction_latency_ms": 15.915307800014489
+        "fit_time_seconds": 0.12483005523681641,
+        "batch_prediction_latency_ms": 15.22517039993545
       },
       "50": {
-        "fit_time_seconds": 0.31964612007141113,
-        "batch_prediction_latency_ms": 27.829017599992767
+        "fit_time_seconds": 0.26186795234680177,
+        "batch_prediction_latency_ms": 26.42265499998757
       },
       "100": {
-        "fit_time_seconds": 0.5164453029632569,
-        "batch_prediction_latency_ms": 36.393904600004134
+        "fit_time_seconds": 0.49662089347839355,
+        "batch_prediction_latency_ms": 36.14455940005428
       },
       "200": {
-        "fit_time_seconds": 1.001784372329712,
-        "batch_prediction_latency_ms": 56.96340259999033
+        "fit_time_seconds": 1.0098543167114258,
+        "batch_prediction_latency_ms": 57.02704619998258
       },
       "300": {
-        "fit_time_seconds": 1.8201375961303712,
-        "batch_prediction_latency_ms": 97.23213140000553
+        "fit_time_seconds": 1.847851610183716,
+        "batch_prediction_latency_ms": 120.9177845999875
       },
       "500": {
-        "fit_time_seconds": 2.644542121887207,
-        "batch_prediction_latency_ms": 200.6152985999961
+        "fit_time_seconds": 2.74631085395813,
+        "batch_prediction_latency_ms": 155.19524079991243
       }
     }
   }
