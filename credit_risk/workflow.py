@@ -31,6 +31,7 @@ from credit_risk.regression import (
     evaluate_final_regression,
 )
 from credit_risk.results import FinalSelection
+from credit_risk.selection import PROJECT_DEFAULT_SELECTION
 from credit_risk.regression import train_regression
 from credit_risk.reporting import (
     save_experiment_artifacts,
@@ -83,10 +84,18 @@ def _selection_template(experiment: dict) -> dict:
 def resolve_default_selection(experiment: dict) -> dict:
     """Resolve the repository-approved reproducibility selection."""
     selection = _selection_template(experiment)
-    selection["classification"]["selected_model"] = "Logistic Regression"
-    selection["classification"]["logistic_regression"]["threshold"] = 0.45
-    selection["classification"]["random_forest"]["n_estimators"] = 100
-    selection["classification"]["random_forest"]["threshold"] = 0.33
+    selection["classification"]["selected_model"] = PROJECT_DEFAULT_SELECTION[
+        "selected_model"
+    ]
+    selection["classification"]["logistic_regression"]["threshold"] = (
+        PROJECT_DEFAULT_SELECTION["logistic_threshold"]
+    )
+    selection["classification"]["random_forest"]["n_estimators"] = (
+        PROJECT_DEFAULT_SELECTION["random_forest_n_estimators"]
+    )
+    selection["classification"]["random_forest"]["threshold"] = (
+        PROJECT_DEFAULT_SELECTION["random_forest_threshold"]
+    )
     return selection
 
 

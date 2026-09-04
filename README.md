@@ -23,7 +23,7 @@ uv run python -m pytest -v
 
 `pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. 데이터 생성 진입점은 `scripts/generate_data.py` 하나이며, `data/generated/finance_data.csv`와 예측 CSV는 생성 파일이라 Git에서 제외됩니다.
 
-권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 dataset/protocol fingerprint가 일치하는 selection으로 Holdout을 한 번만 평가합니다. `python train.py`, `python train.py all`, `run_analysis()`는 같은 두 단계 primitive와 승인된 기본 selection을 쓰는 편의 재현 경로입니다. `--profile smoke`와 legacy `fast=True`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
+권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 dataset/protocol fingerprint가 일치하는 selection으로 Holdout을 한 번만 평가합니다. `python train.py`, `python train.py all`, `run_analysis()`는 같은 두 단계 primitive와 `credit_risk.selection.PROJECT_DEFAULT_SELECTION`을 쓰는 편의 재현 경로입니다. `--profile smoke`와 legacy `fast=True`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
 
 ## 평가 대상
 

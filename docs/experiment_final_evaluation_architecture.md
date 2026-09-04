@@ -234,7 +234,7 @@ Use only five result contracts: `ClassificationExperimentResult`, `RegressionExp
 }
 ```
 
-The repository-approved selection used by `all` is resolved explicitly from the just-completed experiment result and persisted as `experiment/selection.json`. The compatibility path then passes that same validated selection to the final evaluator without reloading it from disk.
+The repository-approved policy used by `all` lives in `credit_risk.selection.PROJECT_DEFAULT_SELECTION`. Its model, thresholds, and RF tree count are combined explicitly with experiment-derived hyperparameters and provenance, then persisted as `experiment/selection.json`. The compatibility path then passes that same validated selection to the final evaluator without reloading it from disk.
 
 ## 17. Dataset fingerprint / experiment provenance
 

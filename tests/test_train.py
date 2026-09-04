@@ -604,7 +604,8 @@ def test_run_analysis_uses_two_stage_artifacts_and_preserves_legacy_result(
     }
 
 
-def test_default_selection_resolves_approved_values_from_experiment():
+def test_project_default_selection_resolves_approved_values_from_experiment():
+    from credit_risk import selection as project_selection
     from credit_risk import workflow
 
     experiment = {
@@ -626,6 +627,12 @@ def test_default_selection_resolves_approved_values_from_experiment():
 
     selection = workflow.resolve_default_selection(experiment)
 
+    assert project_selection.PROJECT_DEFAULT_SELECTION == {
+        "selected_model": "Logistic Regression",
+        "logistic_threshold": 0.45,
+        "random_forest_n_estimators": 100,
+        "random_forest_threshold": 0.33,
+    }
     assert selection["experiment_id"] == "sha256:experiment"
     assert selection["classification"] == {
         "selected_model": "Logistic Regression",
