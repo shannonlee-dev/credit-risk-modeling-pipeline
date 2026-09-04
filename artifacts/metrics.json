@@ -36,6 +36,15 @@
         "fn": 16,
         "fp": 281
       },
+      "Decision Tree": {
+        "accuracy": 0.8845,
+        "precision": 0.51931330472103,
+        "recall": 0.5041666666666667,
+        "f1": 0.5116279069767442,
+        "roc_auc": 0.7202651515151515,
+        "fn": 119,
+        "fp": 112
+      },
       "Random Forest": {
         "accuracy": 0.9095,
         "precision": 0.6528497409326425,
@@ -339,35 +348,36 @@
     "batch_rows": 2000,
     "repeats": 5,
     "model_prediction_latency_ms": {
-      "Rule Baseline": 14.46002499997121,
-      "Logistic Regression": 1.8463017999238218,
-      "Random Forest": 36.463707400071144,
-      "Random Forest (Tuned)": 37.04965279994212
+      "Rule Baseline": 19.107727601658553,
+      "Logistic Regression": 1.7344601918011904,
+      "Decision Tree": 1.8045319942757487,
+      "Random Forest": 26.982372195925564,
+      "Random Forest (Tuned)": 27.269738796167076
     },
     "random_forest_tree_count": {
       "25": {
-        "fit_time_seconds": 0.12483005523681641,
-        "batch_prediction_latency_ms": 15.22517039993545
+        "fit_time_seconds": 0.11209721565246582,
+        "batch_prediction_latency_ms": 17.15690300334245
       },
       "50": {
-        "fit_time_seconds": 0.26186795234680177,
-        "batch_prediction_latency_ms": 26.42265499998757
+        "fit_time_seconds": 0.2283479690551758,
+        "batch_prediction_latency_ms": 16.74333419650793
       },
       "100": {
-        "fit_time_seconds": 0.49662089347839355,
-        "batch_prediction_latency_ms": 36.14455940005428
+        "fit_time_seconds": 0.40523638725280764,
+        "batch_prediction_latency_ms": 29.078238795045763
       },
       "200": {
-        "fit_time_seconds": 1.0098543167114258,
-        "batch_prediction_latency_ms": 57.02704619998258
+        "fit_time_seconds": 0.9206355571746826,
+        "batch_prediction_latency_ms": 38.056387403048575
       },
       "300": {
-        "fit_time_seconds": 1.847851610183716,
-        "batch_prediction_latency_ms": 120.9177845999875
+        "fit_time_seconds": 1.1659769535064697,
+        "batch_prediction_latency_ms": 63.54336079675704
       },
       "500": {
-        "fit_time_seconds": 2.74631085395813,
-        "batch_prediction_latency_ms": 155.19524079991243
+        "fit_time_seconds": 2.1478373050689696,
+        "batch_prediction_latency_ms": 78.11717439908534
       }
     }
   }

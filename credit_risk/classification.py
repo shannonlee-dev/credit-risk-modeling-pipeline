@@ -5,6 +5,7 @@ from time import perf_counter
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -29,6 +30,7 @@ from credit_risk.constants import (
     CV_FOLDS,
     DEBT_RATIO_COLUMN,
     DEFAULT_CLASSIFICATION_THRESHOLD as DEFAULT_THRESHOLD,
+    DECISION_TREE_MODEL,
     LOGISTIC_REGRESSION_MODEL,
     OVERDUE_COUNT_COLUMN,
     RANDOM_FOREST_MODEL,
@@ -407,6 +409,18 @@ def train_classification(
             ),
         ]
     )
+    decision_tree = Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            (
+                "model",
+                DecisionTreeClassifier(
+                    class_weight="balanced",
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ]
+    )
     forest = Pipeline(
         [
             ("preprocessor", build_preprocessor()),
@@ -438,6 +452,7 @@ def train_classification(
     )
     logistic = logistic.set_params(model__C=selected_logistic_c)
     logistic.fit(x_train, y_train)
+    decision_tree.fit(x_train, y_train)
     forest.fit(x_train, y_train)
 
     if grid is not None:
@@ -523,11 +538,13 @@ def train_classification(
 
     rule_predictions = x_test.apply(rule_based_predict, axis=1).to_numpy()
     logistic_scores = logistic.predict_proba(x_test)[:, 1]
+    decision_tree_scores = decision_tree.predict_proba(x_test)[:, 1]
     forest_scores = forest.predict_proba(x_test)[:, 1]
     tuned_scores = tuned_forest.predict_proba(x_test)[:, 1]
     logistic_predictions = (
         logistic_scores >= SELECTED_LOGISTIC_THRESHOLD
     ).astype(int)
+    decision_tree_predictions = (decision_tree_scores >= DEFAULT_THRESHOLD).astype(int)
     forest_predictions = (forest_scores >= DEFAULT_THRESHOLD).astype(int)
     tuned_predictions = (
         tuned_scores >= SELECTED_RANDOM_FOREST_THRESHOLD
@@ -540,6 +557,9 @@ def train_classification(
         LOGISTIC_REGRESSION_MODEL: _average_latency_ms(
             lambda: logistic.predict_proba(latency_batch)
         ),
+        DECISION_TREE_MODEL: _average_latency_ms(
+            lambda: decision_tree.predict_proba(latency_batch)
+        ),
         RANDOM_FOREST_MODEL: _average_latency_ms(
             lambda: forest.predict_proba(latency_batch)
         ),
@@ -550,12 +570,14 @@ def train_classification(
     predictions = {
         RULE_BASELINE_MODEL: rule_predictions,
         LOGISTIC_REGRESSION_MODEL: logistic_predictions,
+        DECISION_TREE_MODEL: decision_tree_predictions,
         RANDOM_FOREST_MODEL: forest_predictions,
         TUNED_RANDOM_FOREST_MODEL: tuned_predictions,
     }
     scores = {
         RULE_BASELINE_MODEL: rule_predictions.astype(float),
         LOGISTIC_REGRESSION_MODEL: logistic_scores,
+        DECISION_TREE_MODEL: decision_tree_scores,
         RANDOM_FOREST_MODEL: forest_scores,
         TUNED_RANDOM_FOREST_MODEL: tuned_scores,
     }
@@ -574,6 +596,8 @@ def train_classification(
             "rule_prediction": rule_predictions,
             "logistic_probability": logistic_scores,
             "logistic_prediction_selected": logistic_predictions,
+            "decision_tree_probability": decision_tree_scores,
+            "decision_tree_prediction": decision_tree_predictions,
             "random_forest_probability": forest_scores,
             "overdue_probability": tuned_scores,
             "tuned_rf_prediction_selected": tuned_predictions,

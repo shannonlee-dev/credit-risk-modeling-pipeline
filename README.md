@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/shannonlee-dev/credit-risk-modeling-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/shannonlee-dev/credit-risk-modeling-pipeline/actions/workflows/tests.yml)
 
-10,000건의 재현 가능한 가상 금융 데이터를 사용해, 규칙 기반 분류와 로지스틱 회귀·랜덤 포레스트, 그리고 리지·라쏘 회귀를 비교하는 지도학습 포트폴리오 프로젝트입니다.
+10,000건의 재현 가능한 가상 금융 데이터를 사용해, 규칙 기반 분류와 로지스틱 회귀·단일 의사결정트리·랜덤 포레스트, 그리고 리지·라쏘 회귀를 비교하는 지도학습 포트폴리오 프로젝트입니다.
 
 ## 범위
 
@@ -27,7 +27,7 @@ uv run python -m pytest -v
 
 ## 평가 대상
 
-- 분류: 여섯 규칙 기반 기준선, 클래스 가중치를 적용한 로지스틱 회귀, 기본·튜닝 랜덤 포레스트
+- 분류: 여섯 규칙 기반 기준선, 클래스 가중치를 적용한 로지스틱 회귀·단일 의사결정트리, 기본·GridSearchCV 튜닝 랜덤 포레스트
 - 회귀: 리지·라쏘의 alpha 민감도와 holdout RMSE·MAE·R²
 - 평가: 고정 80:20 학습·테스트 분할, 학습 데이터 내부 5-fold CV, Pipeline 내부 중앙값 대치와 스케일링
 
@@ -39,6 +39,7 @@ uv run python -m pytest -v
 | --- | ---: | ---: | ---: |
 | Rule Baseline | 0.7725 | 0.4752 | 0.8096 |
 | Logistic Regression (threshold 0.45) | 0.8515 | 0.6013 | 0.9505 |
+| Decision Tree (baseline threshold 0.50) | 0.8845 | 0.5116 | 0.7203 |
 | Random Forest | 0.9095 | 0.5820 | 0.9376 |
 | Random Forest (Tuned, threshold 0.33) | 0.8365 | 0.5725 | 0.9405 |
 
@@ -47,6 +48,8 @@ uv run python -m pytest -v
 - [Generative structure analysis](docs/generative_analysis.md) — synthetic data의 실제 생성식을 모델이 얼마나 복원했는지 분석
 
 규칙 기반 기준선보다 로지스틱 회귀는 F1을 `0.4752 → 0.6013`, ROC-AUC를 `0.8096 → 0.9505`로 높였습니다. 비슷한 OOF Recall 조건으로 맞춘 선택 threshold에서는 Logistic이 Tuned RF보다 Precision과 F1이 높아 최종 분류 모델로 선택했습니다.
+
+단일 의사결정트리와 비교하면, GridSearchCV로 튜닝한 Random Forest는 holdout F1을 `0.5116 → 0.5725`(+`0.0609`), ROC-AUC를 `0.7203 → 0.9405`(+`0.2202`)로 높였습니다. Tuned RF의 Accuracy는 낮지만, 이는 기본 0.50 대신 Recall을 높이기 위해 선택한 0.33 threshold의 영향도 있으므로 Accuracy만으로 두 모델의 우열을 판단하지 않습니다.
 
 ![분류 ROC-AUC 비교](artifacts/roc_curve.png)
 
@@ -114,7 +117,7 @@ tests/                         # 동작 중심 회귀 테스트
 
 ## 앙상블 모델 해석
 
-Random Forest는 여러 트리의 예측을 결합해 단일 트리의 분산을 낮추고 비선형 상호작용을 포착할 수 있습니다. 다만 이 가상 데이터의 위험 구조는 비교적 선형적이어서, Train 5-fold CV ROC-AUC는 Logistic `0.9539`, Tuned RF `0.9480`이었습니다. 비슷한 OOF Recall 조건에서도 Logistic의 F1이 `0.6058`로 RF의 `0.5890`보다 높아, 더 단순한 Logistic을 최종 모델로 선택했습니다.
+Random Forest는 여러 트리의 예측을 결합해 단일 트리의 분산을 낮추고 비선형 상호작용을 포착할 수 있습니다. 같은 holdout에서 단일 의사결정트리의 F1/ROC-AUC는 `0.5116`/`0.7203`이었고, GridSearchCV 튜닝 Random Forest는 `0.5725`/`0.9405`였습니다. 즉 앙상블은 단일 트리보다 F1을 `0.0609`, ROC-AUC를 `0.2202` 높였습니다. 다만 이 가상 데이터의 위험 구조는 비교적 선형적이어서, Train 5-fold CV ROC-AUC는 Logistic `0.9539`, Tuned RF `0.9480`이었습니다. 비슷한 OOF Recall 조건에서도 Logistic의 F1이 `0.6058`로 RF의 `0.5890`보다 높아, 더 단순한 Logistic을 최종 모델로 선택했습니다.
 
 ## 불균형 처리 선택
 
