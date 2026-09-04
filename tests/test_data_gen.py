@@ -8,11 +8,11 @@ from pandas.testing import assert_frame_equal
 from scripts.generate_data import generate_finance_data
 
 
-def test_root_data_gen_script_generates_default_dataset(tmp_path):
+def test_generate_data_script_generates_default_dataset(tmp_path):
     project_root = Path(__file__).resolve().parents[1]
 
     completed = subprocess.run(
-        [sys.executable, str(project_root / "data_gen.py")],
+        [sys.executable, str(project_root / "scripts" / "generate_data.py")],
         cwd=tmp_path,
         capture_output=True,
         text=True,
