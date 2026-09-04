@@ -2,12 +2,15 @@ import json
 import os
 import subprocess
 import sys
+import inspect
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from credit_risk.classification import rule_based_predict
+from credit_risk.evaluation import apply_threshold, evaluate_thresholds
+from credit_risk.results import FinalSelection
 from credit_risk.data import (
     CATEGORICAL_FEATURES,
     FEATURE_COLUMNS,
@@ -84,6 +87,159 @@ def test_class_distribution_reports_literal_counts():
         "count_1": 2,
         "positive_rate": 0.4,
     }
+
+
+def test_threshold_evaluation_is_pure_and_threshold_application_is_explicit():
+    scores = np.array([0.1, 0.4, 0.6, 0.9])
+    table = evaluate_thresholds(
+        pd.Series([0, 1, 1, 0]),
+        scores,
+        thresholds=[0.5],
+    )
+
+    assert list(table) == [
+        "threshold",
+        "predicted_overdue",
+        "tp",
+        "fp",
+        "fn",
+        "precision",
+        "recall",
+        "f1",
+    ]
+    assert table.iloc[0].to_dict() == {
+        "threshold": 0.5,
+        "predicted_overdue": 2.0,
+        "tp": 1.0,
+        "fp": 1.0,
+        "fn": 1.0,
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1": 0.5,
+    }
+    assert apply_threshold(scores, 0.5).tolist() == [0, 0, 1, 1]
+
+
+def test_final_selection_rejects_missing_human_operating_decision():
+    with pytest.raises(ValueError, match="selected_model"):
+        FinalSelection.from_dict(
+            {
+                "classification": {
+                    "selected_model": None,
+                    "logistic_regression": {"C": 0.01, "threshold": None},
+                    "random_forest": {
+                        "n_estimators": None,
+                        "max_depth": 8,
+                        "min_samples_split": 40,
+                        "threshold": None,
+                    },
+                },
+                "regression": {"ridge_alpha": 1.0, "lasso_alpha": 0.1},
+            }
+        )
+
+
+def test_train_only_experiments_do_not_accept_holdout_data(finance_df):
+    from credit_risk.experiments.classification import run_classification_experiment
+    from credit_risk.experiments.config import SMOKE_EXPERIMENT
+    from credit_risk.experiments.regression import run_regression_experiment
+
+    classification_split = split_classification_data(finance_df.head(400))
+    regression_split = split_regression_data(finance_df.head(400))
+
+    classification = run_classification_experiment(
+        classification_split[0], classification_split[2], SMOKE_EXPERIMENT.classification
+    )
+    regression = run_regression_experiment(
+        regression_split[0], regression_split[2], SMOKE_EXPERIMENT.regression
+    )
+
+    assert set(inspect.signature(run_classification_experiment).parameters) == {
+        "x_train", "y_train", "config"
+    }
+    assert set(inspect.signature(run_regression_experiment).parameters) == {
+        "x_train", "y_train", "config"
+    }
+    assert "metrics" not in classification
+    assert "test_metrics" not in regression
+    assert set(classification["logistic_c_analysis"]) == {"0.01", "0.1"}
+    assert set(regression["selected_alpha"]) == {"Ridge", "Lasso"}
+
+
+def test_final_evaluators_use_selected_settings_without_experiment_calls(
+    finance_df,
+    monkeypatch,
+):
+    from credit_risk.classification import evaluate_final_classification
+    from credit_risk.regression import evaluate_final_regression
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("final evaluation must not run experiment code")
+
+    monkeypatch.setattr(
+        "credit_risk.experiments.classification.run_classification_experiment",
+        fail_if_called,
+    )
+    monkeypatch.setattr(
+        "credit_risk.experiments.regression.run_regression_experiment",
+        fail_if_called,
+    )
+    selection = FinalSelection(
+        selected_model="Logistic Regression",
+        logistic_c=0.01,
+        logistic_threshold=0.44,
+        random_forest_n_estimators=10,
+        random_forest_max_depth=4,
+        random_forest_min_samples_split=2,
+        random_forest_threshold=0.32,
+        ridge_alpha=1.0,
+        lasso_alpha=0.1,
+    )
+    classification = evaluate_final_classification(
+        *split_classification_data(finance_df.head(400)), selection
+    )
+    regression = evaluate_final_regression(
+        *split_regression_data(finance_df.head(400)), selection
+    )
+
+    assert classification["selected_model"] == "Logistic Regression"
+    assert classification["selected_threshold"] == 0.44
+    assert classification["predictions"]["logistic_prediction"].isin([0, 1]).all()
+    assert set(regression["test_metrics"]) == {"Ridge", "Lasso"}
+    assert all(predictions.between(0, 1000).all() for predictions in regression["predictions"].values())
+
+
+def test_two_stage_workflow_separates_experiment_and_final_artifacts(
+    finance_df,
+    tmp_path,
+):
+    from credit_risk.experiments.config import SMOKE_EXPERIMENT
+    from credit_risk.workflow import run_experiment, run_final_evaluation
+
+    data_path = tmp_path / "finance.csv"
+    finance_df.head(400).to_csv(data_path, index=False)
+    output_dir = tmp_path / "artifacts"
+    experiment = run_experiment(data_path, output_dir, SMOKE_EXPERIMENT)
+    template_path = output_dir / "experiment" / "selection.template.json"
+    selection = json.loads(template_path.read_text(encoding="utf-8"))
+    selection["classification"]["selected_model"] = "Logistic Regression"
+    selection["classification"]["logistic_regression"]["threshold"] = 0.45
+    selection_path = output_dir / "experiment" / "selection.json"
+    selection_path.write_text(json.dumps(selection), encoding="utf-8")
+
+    final = run_final_evaluation(
+        data_path, selection_path, output_dir, SMOKE_EXPERIMENT
+    )
+
+    assert experiment["profile"] == "smoke"
+    assert (output_dir / "experiment" / "experiment.json").is_file()
+    assert (output_dir / "experiment" / "selection.template.json").is_file()
+    assert (output_dir / "experiment" / "logistic_threshold_sweep.png").is_file()
+    assert not (output_dir / "experiment" / "metrics.json").exists()
+    assert (output_dir / "final" / "metrics.json").is_file()
+    assert (output_dir / "final" / "confusion_matrix.png").is_file()
+    assert (output_dir / "final" / "roc_curve.png").is_file()
+    assert final["selection"]["classification"]["selected_model"] == "Logistic Regression"
 
 
 @pytest.mark.parametrize(

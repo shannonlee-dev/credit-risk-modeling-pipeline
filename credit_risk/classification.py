@@ -38,6 +38,8 @@ from credit_risk.constants import (
     TUNED_RANDOM_FOREST_MODEL,
 )
 from credit_risk.preprocessing import build_preprocessor
+from credit_risk.evaluation import apply_threshold, evaluate_classification
+from credit_risk.results import FinalSelection
 
 
 SELECTED_LOGISTIC_THRESHOLD = 0.45
@@ -72,6 +74,48 @@ _LOGISTIC_MAX_ITERATIONS = 2_000
 _LATENCY_REPEATS = 5
 _LATENCY_BATCH_SIZE = 2_000
 _MILLISECONDS_PER_SECOND = 1_000
+
+
+def build_logistic_classifier(c: float | None = None) -> Pipeline:
+    """Build the project's leakage-safe logistic classifier."""
+    pipeline = Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            (
+                "model",
+                LogisticRegression(
+                    class_weight="balanced",
+                    max_iter=_LOGISTIC_MAX_ITERATIONS,
+                    random_state=RANDOM_STATE,
+                ),
+            ),
+        ]
+    )
+    return pipeline if c is None else pipeline.set_params(model__C=c)
+
+
+def build_random_forest_classifier(
+    n_estimators: int = _DEFAULT_RF_N_ESTIMATORS,
+    max_depth: int | None = None,
+    min_samples_split: int = 2,
+) -> Pipeline:
+    """Build the project's leakage-safe random forest classifier."""
+    return Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            (
+                "model",
+                RandomForestClassifier(
+                    n_estimators=n_estimators,
+                    max_depth=max_depth,
+                    min_samples_split=min_samples_split,
+                    class_weight="balanced",
+                    random_state=RANDOM_STATE,
+                    n_jobs=-1,
+                ),
+            ),
+        ]
+    )
 
 
 def rule_based_predict(row: pd.Series) -> int:
@@ -260,6 +304,84 @@ def _selected_threshold_metrics(sweep: pd.DataFrame) -> dict[str, float]:
         "oof_precision": float(selected["precision"]),
         "oof_recall": float(selected["recall"]),
         "oof_f1": float(selected["f1"]),
+    }
+
+
+def evaluate_final_classification(
+    x_train: pd.DataFrame,
+    x_holdout: pd.DataFrame,
+    y_train: pd.Series,
+    y_holdout: pd.Series,
+    selection: FinalSelection,
+) -> dict:
+    """Fit selected configurations on full Train and evaluate untouched Holdout."""
+    logistic = build_logistic_classifier(selection.logistic_c)
+    forest = build_random_forest_classifier(
+        n_estimators=selection.random_forest_n_estimators or _DEFAULT_RF_N_ESTIMATORS,
+        max_depth=selection.random_forest_max_depth,
+        min_samples_split=selection.random_forest_min_samples_split,
+    )
+    logistic.fit(x_train, y_train)
+    forest.fit(x_train, y_train)
+    batch = x_train.iloc[: min(_LATENCY_BATCH_SIZE, len(x_train))]
+    rule_predictions = x_holdout.apply(rule_based_predict, axis=1).to_numpy()
+    logistic_scores = logistic.predict_proba(x_holdout)[:, 1]
+    forest_scores = forest.predict_proba(x_holdout)[:, 1]
+    logistic_predictions = apply_threshold(
+        logistic_scores, selection.logistic_threshold or DEFAULT_THRESHOLD
+    )
+    forest_predictions = apply_threshold(
+        forest_scores, selection.random_forest_threshold or DEFAULT_THRESHOLD
+    )
+    latencies = {
+        RULE_BASELINE_MODEL: _average_latency_ms(
+            lambda: batch.apply(rule_based_predict, axis=1).to_numpy()
+        ),
+        LOGISTIC_REGRESSION_MODEL: _average_latency_ms(
+            lambda: logistic.predict_proba(batch)
+        ),
+        TUNED_RANDOM_FOREST_MODEL: _average_latency_ms(
+            lambda: forest.predict_proba(batch)
+        ),
+    }
+    predictions = {
+        RULE_BASELINE_MODEL: rule_predictions,
+        LOGISTIC_REGRESSION_MODEL: logistic_predictions,
+        TUNED_RANDOM_FOREST_MODEL: forest_predictions,
+    }
+    scores = {
+        RULE_BASELINE_MODEL: rule_predictions.astype(float),
+        LOGISTIC_REGRESSION_MODEL: logistic_scores,
+        TUNED_RANDOM_FOREST_MODEL: forest_scores,
+    }
+    return {
+        "selected_model": selection.selected_model,
+        "selected_threshold": (
+            selection.logistic_threshold
+            if selection.selected_model == LOGISTIC_REGRESSION_MODEL
+            else selection.random_forest_threshold
+        ),
+        "metrics": {
+            name: evaluate_classification(
+                y_holdout, predictions[name], scores[name], latencies[name]
+            )
+            for name in predictions
+        },
+        "predictions": pd.DataFrame(
+            {
+                "actual_is_overdue": y_holdout.to_numpy(),
+                "rule_prediction": rule_predictions,
+                "logistic_probability": logistic_scores,
+                "logistic_prediction": logistic_predictions,
+                "random_forest_probability": forest_scores,
+                "random_forest_prediction": forest_predictions,
+            }
+        ),
+        "latency_benchmark": {
+            "source": "training_feature_batch",
+            "batch_rows": len(batch),
+            "repeats": _LATENCY_REPEATS,
+        },
     }
 
 

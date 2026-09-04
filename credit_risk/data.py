@@ -1,5 +1,6 @@
 """Dataset schema, loading, validation, and train/test splits."""
 
+from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
@@ -34,6 +35,14 @@ def load_and_validate_data(path: str | Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"누락된 필수 열: {', '.join(missing)}")
     return df
+
+
+def dataset_fingerprint(path: str | Path) -> str:
+    """Return a stable fingerprint for the exact input CSV bytes."""
+    data_path = Path(path)
+    if not data_path.is_file():
+        raise FileNotFoundError(f"데이터 파일을 찾을 수 없습니다: {data_path}")
+    return f"sha256:{sha256(data_path.read_bytes()).hexdigest()}"
 
 
 def split_classification_data(df: pd.DataFrame):

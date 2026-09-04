@@ -15,13 +15,15 @@ Python 3.10 이상이 필요합니다.
 ```bash
 uv sync
 uv run python scripts/generate_data.py
-uv run python train.py
+uv run python train.py experiment
+# artifacts/experiment/selection.template.json을 검토·복사해 selection.json을 작성
+uv run python train.py final --selection artifacts/experiment/selection.json
 uv run python -m pytest -v
 ```
 
 `pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. `data/generated/finance_data.csv`와 예측 CSV는 생성 파일이며 Git에서 제외됩니다.
 
-테스트나 smoke run에서는 Python API의 `run_analysis(..., fast=True)`를 사용할 수 있습니다. 이 모드는 5-fold 평가 방식은 유지하고 Logistic C, RF `min_samples_split`, 트리 수 민감도 후보만 줄입니다. 커밋된 정식 산출물은 기본 모드로 생성합니다.
+권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 검증된 selection으로 Holdout을 한 번만 평가합니다. `python train.py` 또는 `python train.py all`은 승인된 기본 selection을 쓰는 편의 재현 경로입니다. `--profile smoke`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
 
 ## 평가 대상
 
@@ -88,8 +90,10 @@ train.py                       # 명령줄 실행 진입점
 credit_risk/
   data.py                      # 스키마, 검증, 데이터 분할
   preprocessing.py             # 공통 누수 방지 전처리
-  classification.py            # 학습, 교차검증, 임계값, 평가
-  regression.py                # 규제 회귀 모델 선택
+  classification.py            # classifier 구성, baseline, final evaluation
+  regression.py                # regressor 구성, final evaluation
+  evaluation.py                # 순수 metric / threshold 적용
+  experiments/                 # Train-only model selection / OOF analysis
   reporting.py                 # JSON, CSV, 그래프 저장
   workflow.py                  # 실행 흐름 조립
 docs/model_selection.md        # 방법론과 실험 선택 근거
@@ -100,7 +104,7 @@ tests/                         # 동작 중심 회귀 테스트
 
 ## 재현성 및 산출물
 
-`random_state=42`는 데이터 생성, 분할, 모델 난수를 고정합니다. `artifacts/metrics.json`은 평가·선택 결과와 단일 `benchmark` 구역을 담고, PNG는 각 평가 요구사항의 시각적 근거입니다. 실행 시간은 하드웨어에 따라 달라지므로 단일 예측 지연시간과 비교하지 않습니다.
+`random_state=42`는 데이터 생성, 분할, 모델 난수를 고정합니다. `artifacts/experiment/experiment.json`은 Train-only 선택 근거와 provenance를, `artifacts/final/metrics.json`은 Holdout 최종 지표만 담습니다. 실행 시간은 experiment의 비교용 보조 정보이며 단일 예측 지연시간과 비교하지 않습니다.
 
 ## 한계
 

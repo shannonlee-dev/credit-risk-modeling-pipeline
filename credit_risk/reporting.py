@@ -348,3 +348,52 @@ def save_metrics_report(result: dict, output_path: str | Path) -> None:
         json.dumps(metrics_report(result), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+
+def save_experiment_artifacts(result: dict, output_dir: str | Path) -> None:
+    """Write Train-only experiment figures without final-evaluation outputs."""
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    classification = result["classification"]
+    for key, filename, model_name in [
+        ("logistic_threshold_sweep", "logistic_threshold_sweep.png", LOGISTIC_REGRESSION_MODEL),
+        ("random_forest_threshold_sweep", "random_forest_threshold_sweep.png", "Tuned Random Forest"),
+    ]:
+        sweep = classification[key].copy()
+        sweep["is_baseline"] = sweep["threshold"] == DEFAULT_CLASSIFICATION_THRESHOLD
+        sweep["is_selected"] = False
+        _save_threshold_sweep(sweep, destination / filename, model_name)
+    _save_feature_importance(classification["feature_importance"], destination / "feature_importance.png")
+    _save_random_forest_saturation_curve(
+        classification["random_forest_saturation"],
+        100,
+        destination / "random_forest_n_estimators_curve.png",
+    )
+    _save_coefficient_paths(
+        result["regression"]["coefficients"],
+        destination / "regularization_coefficients.png",
+    )
+
+
+def save_final_artifacts(result: dict, output_dir: str | Path) -> None:
+    """Write Holdout-only plots and row-level predictions."""
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    table = result["classification"]["predictions"]
+    _save_confusion_matrices(
+        table["actual_is_overdue"],
+        {
+            "Logistic Regression": table["logistic_prediction"].to_numpy(),
+            "Random Forest (Tuned)": table["random_forest_prediction"].to_numpy(),
+        },
+        destination / "confusion_matrix.png",
+    )
+    _save_roc_curves(
+        table["actual_is_overdue"],
+        {
+            RULE_BASELINE_MODEL: table["rule_prediction"].to_numpy(dtype=float),
+            LOGISTIC_REGRESSION_MODEL: table["logistic_probability"].to_numpy(),
+            TUNED_RANDOM_FOREST_MODEL: table["random_forest_probability"].to_numpy(),
+        },
+        destination / "roc_curve.png",
+    )

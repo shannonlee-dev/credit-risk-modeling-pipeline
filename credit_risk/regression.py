@@ -15,12 +15,15 @@ from credit_risk.constants import (
     CREDIT_SCORE_MAX,
     CREDIT_SCORE_MIN,
     CV_FOLDS,
+    LASSO_MODEL,
     RIDGE_MODEL,
     RANDOM_STATE,
     REGRESSION_ALPHAS as ALPHAS,
     REGRESSION_MODELS,
 )
 from credit_risk.preprocessing import build_preprocessor
+from credit_risk.evaluation import evaluate_regression
+from credit_risk.results import FinalSelection
 
 
 _LASSO_MAX_ITERATIONS = 20_000
@@ -118,4 +121,34 @@ def train_regression(
         "test_metrics": test_metrics,
         "coefficients": coefficients,
         "predictions": clipped_predictions,
+    }
+
+
+def evaluate_final_regression(
+    x_train: pd.DataFrame,
+    x_holdout: pd.DataFrame,
+    y_train: pd.Series,
+    y_holdout: pd.Series,
+    selection: FinalSelection,
+) -> dict:
+    """Fit selected regularized regressors and evaluate untouched Holdout once."""
+    selected_alpha = {
+        RIDGE_MODEL: selection.ridge_alpha,
+        LASSO_MODEL: selection.lasso_alpha,
+    }
+    metrics = {}
+    predictions = {}
+    for model_name, alpha in selected_alpha.items():
+        model = _regularized_pipeline(model_name, alpha)
+        model.fit(x_train, y_train)
+        raw_predictions = model.predict(x_holdout)
+        metrics[model_name] = evaluate_regression(y_holdout, raw_predictions)
+        predictions[model_name] = pd.Series(
+            np.clip(raw_predictions, CREDIT_SCORE_MIN, CREDIT_SCORE_MAX),
+            name=model_name,
+        )
+    return {
+        "selected_alpha": selected_alpha,
+        "test_metrics": metrics,
+        "predictions": predictions,
     }
