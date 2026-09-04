@@ -1,23 +1,14 @@
-"""Regression model training and evaluation without file output."""
+"""Regression builders, final evaluation, and legacy result adaptation."""
 
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import Lasso, Ridge
-from sklearn.metrics import (
-    mean_absolute_error,
-    r2_score,
-    root_mean_squared_error,
-)
-from sklearn.model_selection import KFold, cross_val_score
 from sklearn.pipeline import Pipeline
 
 from credit_risk.constants import (
     CREDIT_SCORE_MAX,
     CREDIT_SCORE_MIN,
-    CV_FOLDS,
     RANDOM_STATE,
-    REGRESSION_ALPHAS,
-    REGRESSION_MODELS,
 )
 from credit_risk.preprocessing import build_preprocessor
 from credit_risk.evaluation import evaluate_regression
@@ -47,75 +38,44 @@ def train_regression(
     y_train: pd.Series,
     y_test: pd.Series,
 ) -> dict:
-    """Select and evaluate Ridge/Lasso models without writing files."""
-    cv = KFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
-    cv_rmse: dict[str, dict[str, float]] = {
-        model_name: {} for model_name in REGRESSION_MODELS
-    }
-    coefficients: dict[str, dict[str, dict[str, float]]] = {
-        model_name: {} for model_name in REGRESSION_MODELS
-    }
+    """Compatibility facade over Train-only experiment and final evaluation."""
+    from credit_risk.experiments.config import FULL_EXPERIMENT
+    from credit_risk.experiments.regression import run_regression_experiment
 
-    for model_name in REGRESSION_MODELS:
-        for alpha in REGRESSION_ALPHAS:
-            pipeline = _regularized_pipeline(model_name, alpha)
-            scores = cross_val_score(
-                pipeline,
-                x_train,
-                y_train,
-                scoring="neg_root_mean_squared_error",
-                cv=cv,
-                n_jobs=-1,
-            )
-            alpha_key = str(alpha)
-            cv_rmse[model_name][alpha_key] = float(-scores.mean())
+    experiment = run_regression_experiment(
+        x_train,
+        y_train,
+        FULL_EXPERIMENT.regression,
+    )
+    selection = FinalSelection(
+        selected_model="Logistic Regression",
+        logistic_c=0.01,
+        logistic_threshold=0.45,
+        random_forest_n_estimators=100,
+        random_forest_max_depth=None,
+        random_forest_min_samples_split=2,
+        random_forest_threshold=0.33,
+        ridge_alpha=experiment["selected_alpha"]["Ridge"],
+        lasso_alpha=experiment["selected_alpha"]["Lasso"],
+    )
+    final = evaluate_final_regression(
+        x_train,
+        x_test,
+        y_train,
+        y_test,
+        selection,
+    )
+    return adapt_legacy_regression_result(experiment, final)
 
-            pipeline.fit(x_train, y_train)
-            feature_names = pipeline.named_steps[
-                "preprocessor"
-            ].get_feature_names_out()
-            model_coefficients = pipeline.named_steps["model"].coef_
-            coefficients[model_name][alpha_key] = {
-                feature.replace("numeric__", "").replace(
-                    "categorical__",
-                    "",
-                ): float(coefficient)
-                for feature, coefficient in zip(
-                    feature_names,
-                    model_coefficients,
-                )
-            }
 
-    selected_alpha = {
-        model_name: float(min(cv_rmse[model_name], key=cv_rmse[model_name].get))
-        for model_name in REGRESSION_MODELS
-    }
-    test_metrics: dict[str, dict[str, float]] = {}
-    clipped_predictions: dict[str, pd.Series] = {}
-
-    for model_name in REGRESSION_MODELS:
-        final_model = _regularized_pipeline(
-            model_name,
-            selected_alpha[model_name],
-        )
-        final_model.fit(x_train, y_train)
-        raw_predictions = final_model.predict(x_test)
-        test_metrics[model_name] = {
-            "rmse": float(root_mean_squared_error(y_test, raw_predictions)),
-            "mae": float(mean_absolute_error(y_test, raw_predictions)),
-            "r2": float(r2_score(y_test, raw_predictions)),
-        }
-        clipped_predictions[model_name] = pd.Series(
-            np.clip(raw_predictions, CREDIT_SCORE_MIN, CREDIT_SCORE_MAX),
-            name=model_name,
-        )
-
+def adapt_legacy_regression_result(experiment: dict, final: dict) -> dict:
+    """Adapt two-stage outputs to the historical regression dictionary."""
     return {
-        "cv_rmse": cv_rmse,
-        "selected_alpha": selected_alpha,
-        "test_metrics": test_metrics,
-        "coefficients": coefficients,
-        "predictions": clipped_predictions,
+        "cv_rmse": experiment["cv_rmse"],
+        "selected_alpha": final["selected_alpha"],
+        "test_metrics": final["test_metrics"],
+        "coefficients": experiment["coefficients"],
+        "predictions": final["predictions"],
     }
 
 

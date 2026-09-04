@@ -213,14 +213,16 @@ def save_classification_artifacts(
     y_test: pd.Series,
     output_dir: str | Path,
 ) -> None:
-    """Save classification tables and plots from an experiment result."""
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
+    """Save legacy classification output into separated stage directories."""
+    experiment_destination = Path(output_dir) / "experiment"
+    final_destination = Path(output_dir) / "final"
+    experiment_destination.mkdir(parents=True, exist_ok=True)
+    final_destination.mkdir(parents=True, exist_ok=True)
     table = result["predictions"]
     _save_confusion_matrices(
         y_test,
         _classification_confusion_predictions(result),
-        destination / "confusion_matrix.png",
+        final_destination / "confusion_matrix.png",
     )
     _save_roc_curves(
         y_test,
@@ -231,35 +233,35 @@ def save_classification_artifacts(
             RANDOM_FOREST_MODEL: table["random_forest_probability"].to_numpy(),
             TUNED_RANDOM_FOREST_MODEL: table["overdue_probability"].to_numpy(),
         },
-        destination / "roc_curve.png",
+        final_destination / "roc_curve.png",
     )
     _save_feature_importance(
         result["feature_importance"],
-        destination / "feature_importance.png",
+        experiment_destination / "feature_importance.png",
     )
     _save_random_forest_saturation_curve(
         result["random_forest_saturation"],
         result["best_params"]["model__n_estimators"],
-        destination / "random_forest_n_estimators_curve.png",
+        experiment_destination / "random_forest_n_estimators_curve.png",
     )
     result["logistic_threshold_sweep"].to_csv(
-        destination / "logistic_threshold_sweep.csv",
+        experiment_destination / "logistic_threshold_sweep.csv",
         index=False,
         float_format="%.6f",
     )
     _save_threshold_sweep(
         result["logistic_threshold_sweep"],
-        destination / "logistic_threshold_sweep.png",
+        experiment_destination / "logistic_threshold_sweep.png",
         LOGISTIC_REGRESSION_MODEL,
     )
     result["random_forest_threshold_sweep"].to_csv(
-        destination / "random_forest_threshold_sweep.csv",
+        experiment_destination / "random_forest_threshold_sweep.csv",
         index=False,
         float_format="%.6f",
     )
     _save_threshold_sweep(
         result["random_forest_threshold_sweep"],
-        destination / "random_forest_threshold_sweep.png",
+        experiment_destination / "random_forest_threshold_sweep.png",
         "Tuned Random Forest",
     )
     pd.DataFrame(
@@ -295,8 +297,14 @@ def save_classification_artifacts(
                 "AUC": result["metrics"][TUNED_RANDOM_FOREST_MODEL]["roc_auc"],
             },
         ]
-    ).to_csv(destination / "classification_metrics_comparison.csv", index=False)
-    table.to_csv(destination / "classification_predictions.csv", index=False)
+    ).to_csv(
+        final_destination / "classification_metrics_comparison.csv",
+        index=False,
+    )
+    table.to_csv(
+        final_destination / "classification_predictions.csv",
+        index=False,
+    )
 
 
 def save_regression_artifacts(
@@ -304,12 +312,14 @@ def save_regression_artifacts(
     y_test: pd.Series,
     output_dir: str | Path,
 ) -> None:
-    """Save regression predictions and coefficient plots."""
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
+    """Save legacy regression output into separated stage directories."""
+    experiment_destination = Path(output_dir) / "experiment"
+    final_destination = Path(output_dir) / "final"
+    experiment_destination.mkdir(parents=True, exist_ok=True)
+    final_destination.mkdir(parents=True, exist_ok=True)
     _save_coefficient_paths(
         result["coefficients"],
-        destination / "regularization_coefficients.png",
+        experiment_destination / "regularization_coefficients.png",
     )
     prediction_table = pd.DataFrame(
         {
@@ -319,7 +329,7 @@ def save_regression_artifacts(
         }
     )
     prediction_table.to_csv(
-        destination / "credit_score_predictions.csv",
+        final_destination / "credit_score_predictions.csv",
         index=False,
     )
 
@@ -401,7 +411,7 @@ def save_experiment_artifacts(result: dict, output_dir: str | Path) -> None:
     _save_feature_importance(classification["feature_importance"], destination / "feature_importance.png")
     _save_random_forest_saturation_curve(
         classification["random_forest_saturation"],
-        100,
+        classification["best_params"]["model__n_estimators"],
         destination / "random_forest_n_estimators_curve.png",
     )
     _save_coefficient_paths(
@@ -429,6 +439,9 @@ def save_final_artifacts(result: dict, output_dir: str | Path) -> None:
             RULE_BASELINE_MODEL: table["rule_prediction"].to_numpy(dtype=float),
             LOGISTIC_REGRESSION_MODEL: table["logistic_probability"].to_numpy(),
             DECISION_TREE_MODEL: table["decision_tree_probability"].to_numpy(),
+            RANDOM_FOREST_MODEL: table[
+                "baseline_random_forest_probability"
+            ].to_numpy(),
             TUNED_RANDOM_FOREST_MODEL: table["random_forest_probability"].to_numpy(),
         },
         destination / "roc_curve.png",
@@ -437,6 +450,7 @@ def save_final_artifacts(result: dict, output_dir: str | Path) -> None:
         RULE_BASELINE_MODEL: "Rule Baseline",
         LOGISTIC_REGRESSION_MODEL: "Logistic Regression",
         DECISION_TREE_MODEL: "Decision Tree",
+        RANDOM_FOREST_MODEL: "Random Forest",
         TUNED_RANDOM_FOREST_MODEL: "Tuned Random Forest",
     }
     pd.DataFrame(

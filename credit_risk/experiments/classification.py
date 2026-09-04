@@ -44,13 +44,37 @@ def run_classification_experiment(
     )
     forest = build_random_forest_classifier(n_estimators=100)
     grid = {
-        "model__n_estimators": [100],
+        "model__n_estimators": list(config.rf_grid_n_estimators_values),
         "model__max_depth": list(config.rf_max_depth_values),
         "model__min_samples_split": list(config.rf_min_samples_split_values),
     }
     search = GridSearchCV(clone(forest), grid, scoring="roc_auc", cv=cv, n_jobs=-1, refit=True)
     search.fit(x_train, y_train)
     tuned_forest = search.best_estimator_
+    grid_analysis = {
+        (
+            "max_depth="
+            f"{params['model__max_depth']}, "
+            "min_samples_split="
+            f"{params['model__min_samples_split']}"
+        ): {
+            "cv_roc_auc_mean": float(mean_score),
+            "cv_roc_auc_std": float(std_score),
+        }
+        for params, mean_score, std_score in zip(
+            search.cv_results_["params"],
+            search.cv_results_["mean_test_score"],
+            search.cv_results_["std_test_score"],
+        )
+    }
+    tuned_forest_cv_f1 = cross_validate(
+        tuned_forest,
+        x_train,
+        y_train,
+        scoring="f1",
+        cv=cv,
+        n_jobs=-1,
+    )
     logistic_oof = cross_val_predict(
         build_logistic_classifier(selected_logistic_c), x_train, y_train,
         cv=cv, method="predict_proba", n_jobs=-1,
@@ -79,6 +103,8 @@ def run_classification_experiment(
         "selected_logistic_c": selected_logistic_c,
         "best_params": search.best_params_,
         "best_cv_roc_auc": float(search.best_score_),
+        "best_cv_f1": float(tuned_forest_cv_f1["test_score"].mean()),
+        "random_forest_grid_analysis": grid_analysis,
         "logistic_threshold_sweep": evaluate_thresholds(y_train, logistic_oof, config.threshold_values),
         "random_forest_threshold_sweep": evaluate_thresholds(y_train, forest_oof, config.threshold_values),
         "random_forest_saturation": sensitivity,

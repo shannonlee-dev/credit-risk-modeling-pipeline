@@ -13,7 +13,7 @@
 
 ## 분류 결과
 
-커밋된 [지표 기록](../artifacts/metrics.json)이 수치의 기준 기록입니다. 현재의 결정적 가상 데이터에서 로지스틱 회귀는 holdout ROC-AUC와 F1이 모두 가장 높습니다. 기본 모델 선택은 holdout 결과가 아니라 학습 5-fold CV ROC-AUC와 단순성을 기준으로 합니다. 이는 가상 결과가 대체로 선형적인 소득·부채·연체 횟수 신호에 의해 생성되기 때문이며, 일반적으로 선형 모델을 선호해야 한다는 뜻은 아닙니다.
+커밋된 [실험 기록](../artifacts/experiment/experiment.json)과 [최종 지표](../artifacts/final/metrics.json)가 수치의 기준 기록입니다. 현재의 결정적 가상 데이터에서 로지스틱 회귀는 holdout ROC-AUC와 F1이 모두 가장 높습니다. 기본 모델 선택은 holdout 결과가 아니라 학습 5-fold CV ROC-AUC와 단순성을 기준으로 합니다. 이는 가상 결과가 대체로 선형적인 소득·부채·연체 횟수 신호에 의해 생성되기 때문이며, 일반적으로 선형 모델을 선호해야 한다는 뜻은 아닙니다.
 
 규칙 기반 모델은 해석 가능한 기준선으로 유지합니다. 이진 출력으로도 AUC를 구할 수 있지만, 하나의 거친 운영점에 기반하므로 연속 위험 점수를 내는 모델의 ROC 곡선과 직접 같은 수준으로 비교할 수는 없습니다.
 
@@ -47,14 +47,13 @@ Tuned Random Forest도 `n_estimators=100` 설정에서 동일한 Train OOF proba
 
 ## 산출물
 
-- `artifacts/metrics.json`: 기계가 읽을 수 있는 지표, 선택된 파라미터와 OOF threshold 요약, 회귀 기록, 단일 성능 측정 구역. `logistic_cv.cv_f1_default_threshold_mean`은 기본 threshold `0.50`의 Train-CV F1이며 선택 threshold의 OOF 지표와 구분됩니다.
-- `artifacts/confusion_matrix.png`: 선택된 Logistic `0.45`와 Tuned RF `0.33`의 Holdout FP/FN 비교
-- `artifacts/logistic_threshold_sweep.csv`, `logistic_threshold_sweep.png`: 선택 기록을 표시한 Logistic Train OOF threshold 표와 그래프
-- `artifacts/random_forest_threshold_sweep.csv`, `random_forest_threshold_sweep.png`: 선택 기록을 표시한 100-tree Tuned RF Train OOF threshold 표와 그래프
-- `artifacts/roc_curve.png`: 분류 성능 비교
-- `artifacts/random_forest_n_estimators_curve.png`, `feature_importance.png`: 앙상블 선택·해석 근거
-- `artifacts/regularization_coefficients.png`: Ridge/Lasso 규제 강도별 계수 변화
-- Git에서 제외되는 `classification_predictions.csv`, `credit_score_predictions.csv`: 로컬에서 재생성 가능한 행 단위 예측 결과
+- `artifacts/experiment/experiment.json`: Train-only CV·OOF·민감도 요약과 dataset/protocol provenance
+- `artifacts/experiment/logistic_threshold_sweep.csv`, `random_forest_threshold_sweep.csv`: Logistic과 100-tree Tuned RF의 Train OOF threshold 표
+- `artifacts/experiment/random_forest_n_estimators_curve.png`, `feature_importance.png`: 앙상블 선택·해석 근거
+- `artifacts/experiment/regularization_coefficients.png`: Ridge/Lasso 규제 강도별 계수 변화
+- `artifacts/final/metrics.json`: 검증된 selection과 최종 Holdout 지표
+- `artifacts/final/confusion_matrix.png`, `roc_curve.png`: 최종 Holdout 분류 비교
+- Git에서 제외되는 `artifacts/final/classification_predictions.csv`, `credit_score_predictions.csv`: 로컬에서 재생성 가능한 행 단위 예측 결과
 
 ## 선택 요약
 

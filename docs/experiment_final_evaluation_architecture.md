@@ -234,7 +234,7 @@ Use only five result contracts: `ClassificationExperimentResult`, `RegressionExp
 }
 ```
 
-The repository-approved selection used by `all` is a checked-in explicit selection fixture/config, not hidden module constants. This makes convenience reproduction deterministic without claiming that it replaces human review.
+The repository-approved selection used by `all` is resolved explicitly from the just-completed experiment result and persisted as `experiment/selection.json`. The compatibility path then passes that same validated selection to the final evaluator without reloading it from disk.
 
 ## 17. Dataset fingerprint / experiment provenance
 

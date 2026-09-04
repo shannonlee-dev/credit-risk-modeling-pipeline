@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "experiment_id": "sha256:0fcea54a09e27319ec1c227b151efd31360a481cbd42f7b75a7db5aad50d830c",
+  "dataset_fingerprint": "sha256:4ddf83dd154ee23bb2374a2bbc1aa56d537ef7ad5114c2f162078756542fe1a2",
+  "protocol_fingerprint": "sha256:bd62665eae584d690b70bdd646eaeccf1360c15a2c58c57852124866c6992eaa",
+  "classification": {
+    "selected_model": null,
+    "logistic_regression": {
+      "C": 0.01,
+      "threshold": null
+    },
+    "random_forest": {
+      "n_estimators": null,
+      "max_depth": 8,
+      "min_samples_split": 40,
+      "threshold": null
+    }
+  },
+  "regression": {
+    "ridge_alpha": 1.0,
+    "lasso_alpha": 0.1
+  }
+}

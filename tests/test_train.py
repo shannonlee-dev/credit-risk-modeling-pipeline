@@ -424,8 +424,10 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "repeats": 5,
         "source": "training_feature_batch",
     }
-    assert (output_dir / "classification_predictions.csv").is_file()
-    comparison = pd.read_csv(output_dir / "classification_metrics_comparison.csv")
+    assert (output_dir / "final" / "classification_predictions.csv").is_file()
+    comparison = pd.read_csv(
+        output_dir / "final" / "classification_metrics_comparison.csv"
+    )
     assert comparison.to_dict(orient="records") == [
         {
             "Model": "Rule Baseline",
@@ -466,9 +468,9 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
             ),
         },
     ]
+    for name in ["confusion_matrix.png", "roc_curve.png"]:
+        assert (output_dir / "final" / name).stat().st_size > 0
     for name in [
-        "confusion_matrix.png",
-        "roc_curve.png",
         "feature_importance.png",
         "random_forest_n_estimators_curve.png",
         "logistic_threshold_sweep.csv",
@@ -476,7 +478,8 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "random_forest_threshold_sweep.csv",
         "random_forest_threshold_sweep.png",
     ]:
-        assert (output_dir / name).stat().st_size > 0
+        assert (output_dir / "experiment" / name).stat().st_size > 0
+    assert not (output_dir / "classification_predictions.csv").exists()
 
 
 def test_confusion_matrix_titles_use_result_thresholds():
@@ -525,11 +528,14 @@ def test_regression_selects_alpha_and_saves_bounded_predictions(
         assert metrics["mae"] > 0
     for predictions in result["predictions"].values():
         assert predictions.between(0, 1000).all()
-    assert (output_dir / "credit_score_predictions.csv").is_file()
-    assert (output_dir / "regularization_coefficients.png").stat().st_size > 0
+    assert (output_dir / "final" / "credit_score_predictions.csv").is_file()
+    assert (
+        output_dir / "experiment" / "regularization_coefficients.png"
+    ).stat().st_size > 0
+    assert not (output_dir / "credit_score_predictions.csv").exists()
 
 
-def test_run_analysis_saves_serializable_metrics_and_predictions(
+def test_run_analysis_uses_two_stage_artifacts_and_preserves_legacy_result(
     finance_df,
     tmp_path,
 ):
@@ -541,17 +547,31 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
 
     assert set(result) == {"data_distribution", "classification", "regression"}
     assert set(result["data_distribution"]) == {"all", "train", "test"}
-    report = json.loads((output_dir / "metrics.json").read_text(encoding="utf-8"))
-    assert "predictions" not in report["classification"]
-    assert "logistic_threshold_sweep" not in report["classification"]
-    assert "random_forest_threshold_sweep" not in report["classification"]
-    assert "latency_benchmark" not in report["classification"]
-    assert "predictions" not in report["regression"]
-    assert report["classification"]["logistic_cv"].keys() == {
+    experiment_report = json.loads(
+        (output_dir / "experiment" / "experiment.json").read_text(encoding="utf-8")
+    )
+    final_report = json.loads(
+        (output_dir / "final" / "metrics.json").read_text(encoding="utf-8")
+    )
+    assert experiment_report["profile"] == "smoke"
+    assert set(final_report) == {
+        "dataset",
+        "selection",
+        "classification",
+        "regression",
+    }
+    assert "logistic_c_analysis" not in final_report["classification"]
+    assert "cv_rmse" not in final_report["regression"]
+    assert not (output_dir / "metrics.json").exists()
+    assert (output_dir / "final" / "classification_predictions.csv").is_file()
+    assert (output_dir / "final" / "credit_score_predictions.csv").is_file()
+
+    classification = result["classification"]
+    assert classification["logistic_cv"].keys() == {
         "cv_f1_default_threshold_mean",
         "roc_auc_mean",
     }
-    threshold_selection = report["classification"]["threshold_selection"]
+    threshold_selection = classification["threshold_selection"]
     assert set(threshold_selection) == {
         "Logistic Regression",
         "Random Forest (Tuned)",
@@ -566,31 +586,56 @@ def test_run_analysis_saves_serializable_metrics_and_predictions(
             "oof_f1",
         }
         assert all(0 <= selection[key] <= 1 for key in selection)
-    assert set(report["benchmark"]) == {
-        "source",
-        "batch_rows",
-        "repeats",
-        "model_prediction_latency_ms",
-        "random_forest_tree_count",
-    }
-    assert all(
-        "batch_prediction_latency_ms" not in metrics
-        for metrics in report["classification"]["metrics"].values()
-    )
-    assert set(report["classification"]["logistic_c_analysis"]) == {
+    assert "batch_prediction_latency_ms" not in final_report["classification"]
+    assert set(classification["logistic_c_analysis"]) == {
         "0.01",
         "0.1",
     }
     assert set(
-        report["classification"]["random_forest_grid_analysis"]
+        classification["random_forest_grid_analysis"]
     ) == {
         f"max_depth={max_depth}, min_samples_split={min_samples_split}"
         for max_depth in [None, 8, 16]
         for min_samples_split in [20, 40]
     }
-    assert set(report["classification"]["random_forest_saturation"]) == {
+    assert set(classification["random_forest_saturation"]) == {
         "50",
         "100",
+    }
+
+
+def test_default_selection_resolves_approved_values_from_experiment():
+    from credit_risk import workflow
+
+    experiment = {
+        "experiment_id": "sha256:experiment",
+        "dataset_fingerprint": "sha256:data",
+        "protocol_fingerprint": "sha256:protocol",
+        "classification": {
+            "selected_logistic_c": 0.03,
+            "best_params": {
+                "model__n_estimators": 100,
+                "model__max_depth": 8,
+                "model__min_samples_split": 40,
+            },
+        },
+        "regression": {
+            "selected_alpha": {"Ridge": 1.0, "Lasso": 0.1},
+        },
+    }
+
+    selection = workflow.resolve_default_selection(experiment)
+
+    assert selection["experiment_id"] == "sha256:experiment"
+    assert selection["classification"] == {
+        "selected_model": "Logistic Regression",
+        "logistic_regression": {"C": 0.03, "threshold": 0.45},
+        "random_forest": {
+            "n_estimators": 100,
+            "max_depth": 8,
+            "min_samples_split": 40,
+            "threshold": 0.33,
+        },
     }
 
 

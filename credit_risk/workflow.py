@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from credit_risk.classification import train_classification
+from credit_risk.classification import (
+    adapt_legacy_classification_result,
+    train_classification,
+)
 from credit_risk.constants import (
     CLASSIFICATION_TARGET,
     DEFAULT_ARTIFACTS_DIR,
@@ -23,14 +26,16 @@ from credit_risk.experiments.classification import run_classification_experiment
 from credit_risk.experiments.config import FULL_EXPERIMENT, SMOKE_EXPERIMENT, ExperimentProfile
 from credit_risk.experiments.regression import run_regression_experiment
 from credit_risk.classification import evaluate_final_classification
-from credit_risk.regression import evaluate_final_regression
+from credit_risk.regression import (
+    adapt_legacy_regression_result,
+    evaluate_final_regression,
+)
 from credit_risk.results import FinalSelection
 from credit_risk.regression import train_regression
 from credit_risk.reporting import (
     save_experiment_artifacts,
     save_final_artifacts,
     save_classification_artifacts,
-    save_metrics_report,
     save_regression_artifacts,
 )
 
@@ -73,6 +78,16 @@ def _selection_template(experiment: dict) -> dict:
             "lasso_alpha": experiment["regression"]["selected_alpha"]["Lasso"],
         },
     }
+
+
+def resolve_default_selection(experiment: dict) -> dict:
+    """Resolve the repository-approved reproducibility selection."""
+    selection = _selection_template(experiment)
+    selection["classification"]["selected_model"] = "Logistic Regression"
+    selection["classification"]["logistic_regression"]["threshold"] = 0.45
+    selection["classification"]["random_forest"]["n_estimators"] = 100
+    selection["classification"]["random_forest"]["threshold"] = 0.33
+    return selection
 
 
 def _json_ready(value):
@@ -124,14 +139,12 @@ def run_experiment(
     return result
 
 
-def run_final_evaluation(
+def _run_final_evaluation(
     data_path: str | Path,
-    selection_path: str | Path,
+    raw_selection: dict,
     output_dir: str | Path = DEFAULT_ARTIFACTS_DIR,
     profile: ExperimentProfile = FULL_EXPERIMENT,
 ) -> dict:
-    """Validate a selection then evaluate its fixed models on untouched Holdout."""
-    raw_selection = json.loads(Path(selection_path).read_text(encoding="utf-8"))
     selection = FinalSelection.from_dict(raw_selection)
     if selection.dataset_fingerprint != dataset_fingerprint(data_path):
         raise ValueError("selection dataset fingerprint does not match current data")
@@ -152,10 +165,17 @@ def run_final_evaluation(
     }
     destination = Path(output_dir) / "final"
     destination.mkdir(parents=True, exist_ok=True)
+    classification_metrics = {
+        key: value
+        for key, value in result["classification"]["metrics"][
+            selection.selected_model
+        ].items()
+        if key != "batch_prediction_latency_ms"
+    }
     metrics = {
         "dataset": result["dataset"],
         "selection": {"classification_model": selection.selected_model, "threshold": result["classification"]["selected_threshold"]},
-        "classification": result["classification"]["metrics"][selection.selected_model],
+        "classification": classification_metrics,
         "regression": {
             name: {"alpha": result["regression"]["selected_alpha"][name], **values}
             for name, values in result["regression"]["test_metrics"].items()
@@ -168,21 +188,46 @@ def run_final_evaluation(
     return result
 
 
+def run_final_evaluation(
+    data_path: str | Path,
+    selection_path: str | Path,
+    output_dir: str | Path = DEFAULT_ARTIFACTS_DIR,
+    profile: ExperimentProfile = FULL_EXPERIMENT,
+) -> dict:
+    """Validate a selection then evaluate its fixed models on untouched Holdout."""
+    raw_selection = json.loads(Path(selection_path).read_text(encoding="utf-8"))
+    return _run_final_evaluation(data_path, raw_selection, output_dir, profile)
+
+
+def _run_all_stages(
+    data_path: str | Path,
+    output_dir: str | Path,
+    profile: ExperimentProfile,
+) -> tuple[dict, dict]:
+    experiment = run_experiment(data_path, output_dir, profile)
+    raw_selection = resolve_default_selection(experiment)
+    selection_path = Path(output_dir) / "experiment" / "selection.json"
+    selection_path.write_text(
+        json.dumps(raw_selection, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    final = _run_final_evaluation(
+        data_path,
+        raw_selection,
+        output_dir,
+        profile,
+    )
+    return experiment, final
+
+
 def run_all(
     data_path: str | Path = DEFAULT_DATA_PATH,
     output_dir: str | Path = DEFAULT_ARTIFACTS_DIR,
     profile: ExperimentProfile = FULL_EXPERIMENT,
 ) -> dict:
     """Reproduce the approved default selection through the two-stage path."""
-    experiment = run_experiment(data_path, output_dir, profile)
-    selection = _selection_template(experiment)
-    selection["classification"]["selected_model"] = "Logistic Regression"
-    selection["classification"]["logistic_regression"]["threshold"] = 0.45
-    selection["classification"]["random_forest"]["n_estimators"] = 100
-    selection["classification"]["random_forest"]["threshold"] = 0.33
-    selection_path = Path(output_dir) / "experiment" / "selection.json"
-    selection_path.write_text(json.dumps(selection, ensure_ascii=False, indent=2), encoding="utf-8")
-    return run_final_evaluation(data_path, selection_path, output_dir, profile)
+    _, final = _run_all_stages(data_path, output_dir, profile)
+    return final
 
 def run_classification(
     x_train: pd.DataFrame,
@@ -224,25 +269,24 @@ def run_analysis(
     output_dir: str | Path = DEFAULT_ARTIFACTS_DIR,
     fast: bool = False,
 ) -> dict:
-    """Run the analysis, optionally using reduced classification candidates."""
-    df = load_and_validate_data(data_path)
-    classification_split = split_classification_data(df)
-    regression_split = split_regression_data(df)
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
-
-    result = {
+    """Compatibility facade over the same two stages used by the CLI."""
+    profile = SMOKE_EXPERIMENT if fast else FULL_EXPERIMENT
+    experiment, final = _run_all_stages(data_path, output_dir, profile)
+    selection = FinalSelection.from_dict(final["selection"])
+    return {
         "data_distribution": {
-            "all": class_distribution(df[CLASSIFICATION_TARGET]),
-            "train": class_distribution(classification_split[2]),
-            "test": class_distribution(classification_split[3]),
+            **experiment["data_distribution"],
+            "test": class_distribution(
+                final["classification"]["predictions"]["actual_is_overdue"]
+            ),
         },
-        "classification": run_classification(
-            *classification_split,
-            destination,
-            fast=fast,
+        "classification": adapt_legacy_classification_result(
+            experiment["classification"],
+            final["classification"],
+            selection,
         ),
-        "regression": run_regression(*regression_split, destination),
+        "regression": adapt_legacy_regression_result(
+            experiment["regression"],
+            final["regression"],
+        ),
     }
-    save_metrics_report(result, destination / "metrics.json")
-    return result

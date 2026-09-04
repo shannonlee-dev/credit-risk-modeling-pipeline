@@ -1,0 +1,906 @@
+{
+  "dataset_fingerprint": "sha256:4ddf83dd154ee23bb2374a2bbc1aa56d537ef7ad5114c2f162078756542fe1a2",
+  "protocol_fingerprint": "sha256:bd62665eae584d690b70bdd646eaeccf1360c15a2c58c57852124866c6992eaa",
+  "experiment_id": "sha256:0fcea54a09e27319ec1c227b151efd31360a481cbd42f7b75a7db5aad50d830c",
+  "profile": "full",
+  "data_distribution": {
+    "all": {
+      "count_0": 8799,
+      "count_1": 1201,
+      "positive_rate": 0.1201
+    },
+    "train": {
+      "count_0": 7039,
+      "count_1": 961,
+      "positive_rate": 0.120125
+    }
+  },
+  "classification": {
+    "logistic_c_analysis": {
+      "0.001": {
+        "cv_roc_auc_mean": 0.9530747355613641,
+        "cv_roc_auc_std": 0.008848637976969094,
+        "cv_f1_mean": 0.6167383376670971
+      },
+      "0.003": {
+        "cv_roc_auc_mean": 0.9537204561417927,
+        "cv_roc_auc_std": 0.008380185025701438,
+        "cv_f1_mean": 0.6229769493343379
+      },
+      "0.01": {
+        "cv_roc_auc_mean": 0.953894797137005,
+        "cv_roc_auc_std": 0.008079816903921733,
+        "cv_f1_mean": 0.6346323150828909
+      },
+      "0.03": {
+        "cv_roc_auc_mean": 0.953857432083417,
+        "cv_roc_auc_std": 0.00796552093208547,
+        "cv_f1_mean": 0.6408128746203554
+      },
+      "0.1": {
+        "cv_roc_auc_mean": 0.9538550338737275,
+        "cv_roc_auc_std": 0.007892861221862491,
+        "cv_f1_mean": 0.6445398301986323
+      }
+    },
+    "selected_logistic_c": 0.01,
+    "best_params": {
+      "model__max_depth": 8,
+      "model__min_samples_split": 40,
+      "model__n_estimators": 100
+    },
+    "best_cv_roc_auc": 0.9479998776879629,
+    "best_cv_f1": 0.6560512629243445,
+    "random_forest_grid_analysis": {
+      "max_depth=None, min_samples_split=5": {
+        "cv_roc_auc_mean": 0.9436107527836896,
+        "cv_roc_auc_std": 0.007336063577197511
+      },
+      "max_depth=None, min_samples_split=10": {
+        "cv_roc_auc_mean": 0.9458812258230033,
+        "cv_roc_auc_std": 0.008067379747517194
+      },
+      "max_depth=None, min_samples_split=20": {
+        "cv_roc_auc_mean": 0.9463908666856191,
+        "cv_roc_auc_std": 0.0071993772597083346
+      },
+      "max_depth=None, min_samples_split=40": {
+        "cv_roc_auc_mean": 0.9475588820376556,
+        "cv_roc_auc_std": 0.007398052019042328
+      },
+      "max_depth=None, min_samples_split=80": {
+        "cv_roc_auc_mean": 0.9468513227579848,
+        "cv_roc_auc_std": 0.00785100023893781
+      },
+      "max_depth=8, min_samples_split=5": {
+        "cv_roc_auc_mean": 0.9460931644095698,
+        "cv_roc_auc_std": 0.007164115428349257
+      },
+      "max_depth=8, min_samples_split=10": {
+        "cv_roc_auc_mean": 0.9469854585856142,
+        "cv_roc_auc_std": 0.006937327138010818
+      },
+      "max_depth=8, min_samples_split=20": {
+        "cv_roc_auc_mean": 0.9473446751555606,
+        "cv_roc_auc_std": 0.007381332032903683
+      },
+      "max_depth=8, min_samples_split=40": {
+        "cv_roc_auc_mean": 0.9479998776879629,
+        "cv_roc_auc_std": 0.006984841460681819
+      },
+      "max_depth=8, min_samples_split=80": {
+        "cv_roc_auc_mean": 0.946948864802853,
+        "cv_roc_auc_std": 0.00788548972261135
+      },
+      "max_depth=16, min_samples_split=5": {
+        "cv_roc_auc_mean": 0.9436942564816885,
+        "cv_roc_auc_std": 0.009422353644941357
+      },
+      "max_depth=16, min_samples_split=10": {
+        "cv_roc_auc_mean": 0.9451162378066418,
+        "cv_roc_auc_std": 0.008178091535612051
+      },
+      "max_depth=16, min_samples_split=20": {
+        "cv_roc_auc_mean": 0.9465266675395589,
+        "cv_roc_auc_std": 0.00793448496919839
+      },
+      "max_depth=16, min_samples_split=40": {
+        "cv_roc_auc_mean": 0.9474548222904657,
+        "cv_roc_auc_std": 0.0074923356571022824
+      },
+      "max_depth=16, min_samples_split=80": {
+        "cv_roc_auc_mean": 0.9468513227579848,
+        "cv_roc_auc_std": 0.00785100023893781
+      }
+    },
+    "logistic_threshold_sweep": [
+      {
+        "threshold": 0.3,
+        "predicted_overdue": 2795,
+        "tp": 947,
+        "fp": 1848,
+        "fn": 14,
+        "precision": 0.33881932021466904,
+        "recall": 0.9854318418314256,
+        "f1": 0.5042598509052183
+      },
+      {
+        "threshold": 0.31,
+        "predicted_overdue": 2731,
+        "tp": 945,
+        "fp": 1786,
+        "fn": 16,
+        "precision": 0.34602709630172096,
+        "recall": 0.9833506763787722,
+        "f1": 0.5119176598049837
+      },
+      {
+        "threshold": 0.32,
+        "predicted_overdue": 2687,
+        "tp": 942,
+        "fp": 1745,
+        "fn": 19,
+        "precision": 0.35057685150725715,
+        "recall": 0.9802289281997919,
+        "f1": 0.5164473684210527
+      },
+      {
+        "threshold": 0.33,
+        "predicted_overdue": 2633,
+        "tp": 942,
+        "fp": 1691,
+        "fn": 19,
+        "precision": 0.3577668059248006,
+        "recall": 0.9802289281997919,
+        "f1": 0.5242070116861436
+      },
+      {
+        "threshold": 0.34,
+        "predicted_overdue": 2578,
+        "tp": 939,
+        "fp": 1639,
+        "fn": 22,
+        "precision": 0.36423584173778123,
+        "recall": 0.9771071800208116,
+        "f1": 0.530658378072902
+      },
+      {
+        "threshold": 0.35,
+        "predicted_overdue": 2527,
+        "tp": 936,
+        "fp": 1591,
+        "fn": 25,
+        "precision": 0.370399683419074,
+        "recall": 0.9739854318418314,
+        "f1": 0.536697247706422
+      },
+      {
+        "threshold": 0.36,
+        "predicted_overdue": 2472,
+        "tp": 935,
+        "fp": 1537,
+        "fn": 26,
+        "precision": 0.3782362459546926,
+        "recall": 0.9729448491155047,
+        "f1": 0.5447130789397029
+      },
+      {
+        "threshold": 0.37,
+        "predicted_overdue": 2417,
+        "tp": 933,
+        "fp": 1484,
+        "fn": 28,
+        "precision": 0.38601572196938355,
+        "recall": 0.9708636836628513,
+        "f1": 0.5523978685612788
+      },
+      {
+        "threshold": 0.38,
+        "predicted_overdue": 2364,
+        "tp": 931,
+        "fp": 1433,
+        "fn": 30,
+        "precision": 0.39382402707275804,
+        "recall": 0.9687825182101977,
+        "f1": 0.56
+      },
+      {
+        "threshold": 0.39,
+        "predicted_overdue": 2303,
+        "tp": 928,
+        "fp": 1375,
+        "fn": 33,
+        "precision": 0.4029526704298741,
+        "recall": 0.9656607700312175,
+        "f1": 0.5686274509803921
+      },
+      {
+        "threshold": 0.4,
+        "predicted_overdue": 2264,
+        "tp": 926,
+        "fp": 1338,
+        "fn": 35,
+        "precision": 0.4090106007067138,
+        "recall": 0.963579604578564,
+        "f1": 0.5742635658914729
+      },
+      {
+        "threshold": 0.41,
+        "predicted_overdue": 2217,
+        "tp": 923,
+        "fp": 1294,
+        "fn": 38,
+        "precision": 0.41632837167343256,
+        "recall": 0.9604578563995838,
+        "f1": 0.5808684707363121
+      },
+      {
+        "threshold": 0.42,
+        "predicted_overdue": 2177,
+        "tp": 922,
+        "fp": 1255,
+        "fn": 39,
+        "precision": 0.42351860358291227,
+        "recall": 0.959417273673257,
+        "f1": 0.5876354365838113
+      },
+      {
+        "threshold": 0.43,
+        "predicted_overdue": 2129,
+        "tp": 919,
+        "fp": 1210,
+        "fn": 42,
+        "precision": 0.4316580554250822,
+        "recall": 0.9562955254942768,
+        "f1": 0.594822006472492
+      },
+      {
+        "threshold": 0.44,
+        "predicted_overdue": 2086,
+        "tp": 912,
+        "fp": 1174,
+        "fn": 49,
+        "precision": 0.43720038350910834,
+        "recall": 0.9490114464099896,
+        "f1": 0.5986215950114867
+      },
+      {
+        "threshold": 0.45,
+        "predicted_overdue": 2040,
+        "tp": 909,
+        "fp": 1131,
+        "fn": 52,
+        "precision": 0.4455882352941177,
+        "recall": 0.9458896982310093,
+        "f1": 0.6057980673108964
+      },
+      {
+        "threshold": 0.46,
+        "predicted_overdue": 2009,
+        "tp": 904,
+        "fp": 1105,
+        "fn": 57,
+        "precision": 0.4499751119960179,
+        "recall": 0.9406867845993756,
+        "f1": 0.6087542087542087
+      },
+      {
+        "threshold": 0.47,
+        "predicted_overdue": 1970,
+        "tp": 901,
+        "fp": 1069,
+        "fn": 60,
+        "precision": 0.4573604060913706,
+        "recall": 0.9375650364203955,
+        "f1": 0.6148072330262709
+      },
+      {
+        "threshold": 0.48,
+        "predicted_overdue": 1938,
+        "tp": 898,
+        "fp": 1040,
+        "fn": 63,
+        "precision": 0.4633642930856553,
+        "recall": 0.9344432882414152,
+        "f1": 0.6195239737840634
+      },
+      {
+        "threshold": 0.49,
+        "predicted_overdue": 1888,
+        "tp": 896,
+        "fp": 992,
+        "fn": 65,
+        "precision": 0.4745762711864407,
+        "recall": 0.9323621227887617,
+        "f1": 0.628992628992629
+      },
+      {
+        "threshold": 0.5,
+        "predicted_overdue": 1862,
+        "tp": 895,
+        "fp": 967,
+        "fn": 66,
+        "precision": 0.4806659505907626,
+        "recall": 0.931321540062435,
+        "f1": 0.6340772228126107
+      },
+      {
+        "threshold": 0.51,
+        "predicted_overdue": 1816,
+        "tp": 889,
+        "fp": 927,
+        "fn": 72,
+        "precision": 0.4895374449339207,
+        "recall": 0.9250780437044746,
+        "f1": 0.640259272596327
+      },
+      {
+        "threshold": 0.52,
+        "predicted_overdue": 1785,
+        "tp": 884,
+        "fp": 901,
+        "fn": 77,
+        "precision": 0.49523809523809526,
+        "recall": 0.9198751300728408,
+        "f1": 0.6438455935906774
+      },
+      {
+        "threshold": 0.53,
+        "predicted_overdue": 1748,
+        "tp": 877,
+        "fp": 871,
+        "fn": 84,
+        "precision": 0.5017162471395881,
+        "recall": 0.9125910509885536,
+        "f1": 0.6474713916574382
+      },
+      {
+        "threshold": 0.54,
+        "predicted_overdue": 1713,
+        "tp": 872,
+        "fp": 841,
+        "fn": 89,
+        "precision": 0.5090484530064214,
+        "recall": 0.9073881373569199,
+        "f1": 0.6522064323111444
+      },
+      {
+        "threshold": 0.55,
+        "predicted_overdue": 1674,
+        "tp": 863,
+        "fp": 811,
+        "fn": 98,
+        "precision": 0.515531660692951,
+        "recall": 0.8980228928199792,
+        "f1": 0.6550284629981025
+      },
+      {
+        "threshold": 0.56,
+        "predicted_overdue": 1638,
+        "tp": 857,
+        "fp": 781,
+        "fn": 104,
+        "precision": 0.5231990231990232,
+        "recall": 0.8917793964620188,
+        "f1": 0.6594844170834937
+      },
+      {
+        "threshold": 0.57,
+        "predicted_overdue": 1606,
+        "tp": 852,
+        "fp": 754,
+        "fn": 109,
+        "precision": 0.5305105853051059,
+        "recall": 0.886576482830385,
+        "f1": 0.6638098948188547
+      },
+      {
+        "threshold": 0.58,
+        "predicted_overdue": 1564,
+        "tp": 847,
+        "fp": 717,
+        "fn": 114,
+        "precision": 0.5415601023017903,
+        "recall": 0.8813735691987513,
+        "f1": 0.6708910891089109
+      },
+      {
+        "threshold": 0.59,
+        "predicted_overdue": 1523,
+        "tp": 836,
+        "fp": 687,
+        "fn": 125,
+        "precision": 0.5489166119500984,
+        "recall": 0.8699271592091571,
+        "f1": 0.6731078904991948
+      },
+      {
+        "threshold": 0.6,
+        "predicted_overdue": 1494,
+        "tp": 833,
+        "fp": 661,
+        "fn": 128,
+        "precision": 0.5575635876840697,
+        "recall": 0.8668054110301769,
+        "f1": 0.6786150712830957
+      }
+    ],
+    "random_forest_threshold_sweep": [
+      {
+        "threshold": 0.3,
+        "predicted_overdue": 2236,
+        "tp": 917,
+        "fp": 1319,
+        "fn": 44,
+        "precision": 0.41010733452593917,
+        "recall": 0.9542143600416233,
+        "f1": 0.5736628088833281
+      },
+      {
+        "threshold": 0.31,
+        "predicted_overdue": 2194,
+        "tp": 916,
+        "fp": 1278,
+        "fn": 45,
+        "precision": 0.41750227894257064,
+        "recall": 0.9531737773152965,
+        "f1": 0.5806656101426307
+      },
+      {
+        "threshold": 0.32,
+        "predicted_overdue": 2161,
+        "tp": 913,
+        "fp": 1248,
+        "fn": 48,
+        "precision": 0.4224895881536326,
+        "recall": 0.9500520291363164,
+        "f1": 0.5848814862267777
+      },
+      {
+        "threshold": 0.33,
+        "predicted_overdue": 2122,
+        "tp": 908,
+        "fp": 1214,
+        "fn": 53,
+        "precision": 0.4278982092365693,
+        "recall": 0.9448491155046826,
+        "f1": 0.5890366526110931
+      },
+      {
+        "threshold": 0.34,
+        "predicted_overdue": 2083,
+        "tp": 903,
+        "fp": 1180,
+        "fn": 58,
+        "precision": 0.43350936149783964,
+        "recall": 0.9396462018730489,
+        "f1": 0.5932982917214192
+      },
+      {
+        "threshold": 0.35,
+        "predicted_overdue": 2042,
+        "tp": 896,
+        "fp": 1146,
+        "fn": 65,
+        "precision": 0.4387855044074437,
+        "recall": 0.9323621227887617,
+        "f1": 0.5967365967365967
+      },
+      {
+        "threshold": 0.36,
+        "predicted_overdue": 2008,
+        "tp": 893,
+        "fp": 1115,
+        "fn": 68,
+        "precision": 0.4447211155378486,
+        "recall": 0.9292403746097815,
+        "f1": 0.6015493432132031
+      },
+      {
+        "threshold": 0.37,
+        "predicted_overdue": 1976,
+        "tp": 892,
+        "fp": 1084,
+        "fn": 69,
+        "precision": 0.451417004048583,
+        "recall": 0.9281997918834547,
+        "f1": 0.6074225400068096
+      },
+      {
+        "threshold": 0.38,
+        "predicted_overdue": 1941,
+        "tp": 890,
+        "fp": 1051,
+        "fn": 71,
+        "precision": 0.4585265327150953,
+        "recall": 0.9261186264308012,
+        "f1": 0.6133700895933839
+      },
+      {
+        "threshold": 0.39,
+        "predicted_overdue": 1914,
+        "tp": 887,
+        "fp": 1027,
+        "fn": 74,
+        "precision": 0.46342737722048066,
+        "recall": 0.922996878251821,
+        "f1": 0.6170434782608696
+      },
+      {
+        "threshold": 0.4,
+        "predicted_overdue": 1880,
+        "tp": 885,
+        "fp": 995,
+        "fn": 76,
+        "precision": 0.47074468085106386,
+        "recall": 0.9209157127991675,
+        "f1": 0.6230200633579726
+      },
+      {
+        "threshold": 0.41,
+        "predicted_overdue": 1853,
+        "tp": 883,
+        "fp": 970,
+        "fn": 78,
+        "precision": 0.47652455477603883,
+        "recall": 0.918834547346514,
+        "f1": 0.6275764036958067
+      },
+      {
+        "threshold": 0.42,
+        "predicted_overdue": 1834,
+        "tp": 879,
+        "fp": 955,
+        "fn": 82,
+        "precision": 0.4792802617230098,
+        "recall": 0.9146722164412071,
+        "f1": 0.6289803220035778
+      },
+      {
+        "threshold": 0.43,
+        "predicted_overdue": 1811,
+        "tp": 876,
+        "fp": 935,
+        "fn": 85,
+        "precision": 0.48371065709552735,
+        "recall": 0.9115504682622269,
+        "f1": 0.6320346320346321
+      },
+      {
+        "threshold": 0.44,
+        "predicted_overdue": 1792,
+        "tp": 871,
+        "fp": 921,
+        "fn": 90,
+        "precision": 0.48604910714285715,
+        "recall": 0.9063475546305931,
+        "f1": 0.632764257173992
+      },
+      {
+        "threshold": 0.45,
+        "predicted_overdue": 1765,
+        "tp": 869,
+        "fp": 896,
+        "fn": 92,
+        "precision": 0.49235127478753543,
+        "recall": 0.9042663891779397,
+        "f1": 0.6375641966250917
+      },
+      {
+        "threshold": 0.46,
+        "predicted_overdue": 1744,
+        "tp": 867,
+        "fp": 877,
+        "fn": 94,
+        "precision": 0.49713302752293576,
+        "recall": 0.9021852237252862,
+        "f1": 0.6410351201478743
+      },
+      {
+        "threshold": 0.47,
+        "predicted_overdue": 1717,
+        "tp": 864,
+        "fp": 853,
+        "fn": 97,
+        "precision": 0.5032032615026208,
+        "recall": 0.899063475546306,
+        "f1": 0.6452576549663929
+      },
+      {
+        "threshold": 0.48,
+        "predicted_overdue": 1699,
+        "tp": 863,
+        "fp": 836,
+        "fn": 98,
+        "precision": 0.5079458505002943,
+        "recall": 0.8980228928199792,
+        "f1": 0.6488721804511278
+      },
+      {
+        "threshold": 0.49,
+        "predicted_overdue": 1673,
+        "tp": 859,
+        "fp": 814,
+        "fn": 102,
+        "precision": 0.5134488942020323,
+        "recall": 0.8938605619146722,
+        "f1": 0.6522399392558846
+      },
+      {
+        "threshold": 0.5,
+        "predicted_overdue": 1653,
+        "tp": 857,
+        "fp": 796,
+        "fn": 104,
+        "precision": 0.5184513006654567,
+        "recall": 0.8917793964620188,
+        "f1": 0.6557000765110941
+      },
+      {
+        "threshold": 0.51,
+        "predicted_overdue": 1628,
+        "tp": 852,
+        "fp": 776,
+        "fn": 109,
+        "precision": 0.5233415233415234,
+        "recall": 0.886576482830385,
+        "f1": 0.6581691772885284
+      },
+      {
+        "threshold": 0.52,
+        "predicted_overdue": 1609,
+        "tp": 845,
+        "fp": 764,
+        "fn": 116,
+        "precision": 0.5251709136109385,
+        "recall": 0.8792924037460979,
+        "f1": 0.6575875486381323
+      },
+      {
+        "threshold": 0.53,
+        "predicted_overdue": 1591,
+        "tp": 839,
+        "fp": 752,
+        "fn": 122,
+        "precision": 0.5273412947831553,
+        "recall": 0.8730489073881373,
+        "f1": 0.6575235109717869
+      },
+      {
+        "threshold": 0.54,
+        "predicted_overdue": 1572,
+        "tp": 836,
+        "fp": 736,
+        "fn": 125,
+        "precision": 0.5318066157760815,
+        "recall": 0.8699271592091571,
+        "f1": 0.6600868535333596
+      },
+      {
+        "threshold": 0.55,
+        "predicted_overdue": 1556,
+        "tp": 834,
+        "fp": 722,
+        "fn": 127,
+        "precision": 0.5359897172236504,
+        "recall": 0.8678459937565036,
+        "f1": 0.6626936829558999
+      },
+      {
+        "threshold": 0.56,
+        "predicted_overdue": 1531,
+        "tp": 829,
+        "fp": 702,
+        "fn": 132,
+        "precision": 0.5414761593729589,
+        "recall": 0.8626430801248699,
+        "f1": 0.6653290529695024
+      },
+      {
+        "threshold": 0.57,
+        "predicted_overdue": 1506,
+        "tp": 823,
+        "fp": 683,
+        "fn": 138,
+        "precision": 0.546480743691899,
+        "recall": 0.8563995837669095,
+        "f1": 0.6672071341710579
+      },
+      {
+        "threshold": 0.58,
+        "predicted_overdue": 1487,
+        "tp": 819,
+        "fp": 668,
+        "fn": 142,
+        "precision": 0.550773369199731,
+        "recall": 0.8522372528616025,
+        "f1": 0.6691176470588235
+      },
+      {
+        "threshold": 0.59,
+        "predicted_overdue": 1456,
+        "tp": 811,
+        "fp": 645,
+        "fn": 150,
+        "precision": 0.5570054945054945,
+        "recall": 0.8439125910509886,
+        "f1": 0.6710798510550269
+      },
+      {
+        "threshold": 0.6,
+        "predicted_overdue": 1427,
+        "tp": 800,
+        "fp": 627,
+        "fn": 161,
+        "precision": 0.5606166783461808,
+        "recall": 0.8324661810613944,
+        "f1": 0.6700167504187605
+      }
+    ],
+    "random_forest_saturation": {
+      "25": {
+        "cv_roc_auc_mean": 0.9463020526901014,
+        "cv_roc_auc_std": 0.006251105149659215,
+        "cv_f1_mean": 0.6515199315695538,
+        "fit_time_seconds": 0.16491093635559081,
+        "batch_prediction_latency_ms": 15.878525999869453
+      },
+      "50": {
+        "cv_roc_auc_mean": 0.94732945505979,
+        "cv_roc_auc_std": 0.007062082239409923,
+        "cv_f1_mean": 0.6557496778531562,
+        "fit_time_seconds": 0.3188781261444092,
+        "batch_prediction_latency_ms": 27.536509199853754
+      },
+      "100": {
+        "cv_roc_auc_mean": 0.9479998776879629,
+        "cv_roc_auc_std": 0.006984841460681819,
+        "cv_f1_mean": 0.6560512629243445,
+        "fit_time_seconds": 0.7158498287200927,
+        "batch_prediction_latency_ms": 36.99733199991897
+      },
+      "200": {
+        "cv_roc_auc_mean": 0.9482122937652623,
+        "cv_roc_auc_std": 0.007166291790487064,
+        "cv_f1_mean": 0.655970630481358,
+        "fit_time_seconds": 1.172947311401367,
+        "batch_prediction_latency_ms": 68.94601820004027
+      },
+      "300": {
+        "cv_roc_auc_mean": 0.948215100777505,
+        "cv_roc_auc_std": 0.007231851751135467,
+        "cv_f1_mean": 0.6537869283487115,
+        "fit_time_seconds": 1.9117887020111084,
+        "batch_prediction_latency_ms": 81.1957424000866
+      },
+      "500": {
+        "cv_roc_auc_mean": 0.948236583700278,
+        "cv_roc_auc_std": 0.007452097530655353,
+        "cv_f1_mean": 0.6535450551066193,
+        "fit_time_seconds": 3.1141961097717283,
+        "batch_prediction_latency_ms": 165.63752439997188
+      }
+    },
+    "feature_importance": {
+      "annual_income": 0.5254690963148688,
+      "overdue_count_6m": 0.2547596079368939,
+      "debt_ratio": 0.16142003794517842,
+      "spending_score": 0.026787212508678576,
+      "age": 0.021360552664579664,
+      "credit_card_count": 0.0102034926298006
+    },
+    "latency_benchmark": {
+      "source": "training_feature_batch",
+      "batch_rows": 2000,
+      "repeats": 5
+    }
+  },
+  "regression": {
+    "cv_rmse": {
+      "Ridge": {
+        "0.01": 29.77211242765916,
+        "0.1": 29.772112179032188,
+        "1": 29.772111667073112,
+        "10": 29.77230337053545,
+        "100": 29.793301660723888
+      },
+      "Lasso": {
+        "0.01": 29.77197802885151,
+        "0.1": 29.771587340361798,
+        "1": 29.81794780742795,
+        "10": 34.37504595375255,
+        "100": 80.24950975160799
+      }
+    },
+    "selected_alpha": {
+      "Ridge": 1.0,
+      "Lasso": 0.1
+    },
+    "coefficients": {
+      "Ridge": {
+        "0.01": {
+          "age": -0.11005311977585672,
+          "annual_income": 57.824627632140256,
+          "spending_score": -0.31841338692216187,
+          "debt_ratio": -28.817860855556123,
+          "overdue_count_6m": -36.05762911907414,
+          "credit_card_count": 0.3243212941104481
+        },
+        "0.1": {
+          "age": -0.11006344383697957,
+          "annual_income": 57.823984227163244,
+          "spending_score": -0.3184029880120276,
+          "debt_ratio": -28.8175494954675,
+          "overdue_count_6m": -36.05722520319018,
+          "credit_card_count": 0.3243296948515217
+        },
+        "1": {
+          "age": -0.11016665719652209,
+          "annual_income": 57.81755096561231,
+          "spending_score": -0.31829901966505847,
+          "debt_ratio": -28.81443626422374,
+          "overdue_count_6m": -36.05318654199254,
+          "credit_card_count": 0.3244136772702612
+        },
+        "10": {
+          "age": -0.1111960708478202,
+          "annual_income": 57.75329707459788,
+          "spending_score": -0.3172614081279185,
+          "debt_ratio": -28.783340871847795,
+          "overdue_count_6m": -36.01284963241341,
+          "credit_card_count": 0.32525100715843963
+        },
+        "100": {
+          "age": -0.1212233507449902,
+          "annual_income": 57.118534372954066,
+          "spending_score": -0.3070890349117592,
+          "debt_ratio": -28.476035292825973,
+          "overdue_count_6m": -35.61438973722595,
+          "credit_card_count": 0.3333796944485313
+        }
+      },
+      "Lasso": {
+        "0.01": {
+          "age": -0.10026995741301735,
+          "annual_income": 57.815330825943136,
+          "spending_score": -0.3081294444818747,
+          "debt_ratio": -28.807629761217495,
+          "overdue_count_6m": -36.04782337048339,
+          "credit_card_count": 0.31434683241605954
+        },
+        "0.1": {
+          "age": -0.01223204343663869,
+          "annual_income": 57.73101610969234,
+          "spending_score": -0.21556360363293206,
+          "debt_ratio": -28.715238550416103,
+          "overdue_count_6m": -35.95916771428132,
+          "credit_card_count": 0.22458507990882096
+        },
+        "1": {
+          "age": -0.0,
+          "annual_income": 56.85633120043992,
+          "spending_score": -0.0,
+          "debt_ratio": -27.826420682431273,
+          "overdue_count_6m": -35.06239390079598,
+          "credit_card_count": 0.0
+        },
+        "10": {
+          "age": -0.0,
+          "annual_income": 48.06175371146176,
+          "spending_score": -0.0,
+          "debt_ratio": -19.003953750132776,
+          "overdue_count_6m": -26.083982244241618,
+          "credit_card_count": 0.0
+        },
+        "100": {
+          "age": -0.0,
+          "annual_income": 0.0,
+          "spending_score": 0.0,
+          "debt_ratio": -0.0,
+          "overdue_count_6m": -0.0,
+          "credit_card_count": 0.0
+        }
+      }
+    }
+  }
+}

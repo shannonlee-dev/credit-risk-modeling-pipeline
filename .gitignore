@@ -1,7 +1,7 @@
 finance_data.csv
 data/generated/finance_data.csv
-artifacts/classification_predictions.csv
-artifacts/credit_score_predictions.csv
+artifacts/final/classification_predictions.csv
+artifacts/final/credit_score_predictions.csv
 .venv/
 __pycache__/
 .pytest_cache/

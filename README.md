@@ -21,9 +21,9 @@ uv run python train.py final --selection artifacts/experiment/selection.json
 uv run python -m pytest -v
 ```
 
-`pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. `data/generated/finance_data.csv`와 예측 CSV는 생성 파일이며 Git에서 제외됩니다.
+`pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. 데이터 생성 진입점은 `scripts/generate_data.py` 하나이며, `data/generated/finance_data.csv`와 예측 CSV는 생성 파일이라 Git에서 제외됩니다.
 
-권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 검증된 selection으로 Holdout을 한 번만 평가합니다. `python train.py` 또는 `python train.py all`은 승인된 기본 selection을 쓰는 편의 재현 경로입니다. `--profile smoke`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
+권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 dataset/protocol fingerprint가 일치하는 selection으로 Holdout을 한 번만 평가합니다. `python train.py`, `python train.py all`, `run_analysis()`는 같은 두 단계 primitive와 승인된 기본 selection을 쓰는 편의 재현 경로입니다. `--profile smoke`와 legacy `fast=True`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
 
 ## 평가 대상
 
@@ -43,7 +43,7 @@ uv run python -m pytest -v
 | Random Forest | 0.9095 | 0.5820 | 0.9376 |
 | Random Forest (Tuned, threshold 0.33) | 0.8365 | 0.5725 | 0.9405 |
 
-상세 CV·threshold·hyperparameter 결과는 [model_selection.md](docs/model_selection.md)와 [metrics.json](artifacts/metrics.json)을 참조합니다.
+상세 CV·threshold·hyperparameter 근거는 [model_selection.md](docs/model_selection.md)와 [experiment.json](artifacts/experiment/experiment.json)을, 최종 Holdout 결과는 [final metrics.json](artifacts/final/metrics.json)을 참조합니다.
 
 - [Generative structure analysis](docs/generative_analysis.md) — synthetic data의 실제 생성식을 모델이 얼마나 복원했는지 분석
 
@@ -51,9 +51,9 @@ uv run python -m pytest -v
 
 단일 의사결정트리와 비교하면, GridSearchCV로 튜닝한 Random Forest는 holdout F1을 `0.5116 → 0.5725`(+`0.0609`), ROC-AUC를 `0.7203 → 0.9405`(+`0.2202`)로 높였습니다. Tuned RF의 Accuracy는 낮지만, 이는 기본 0.50 대신 Recall을 높이기 위해 선택한 0.33 threshold의 영향도 있으므로 Accuracy만으로 두 모델의 우열을 판단하지 않습니다.
 
-![분류 ROC-AUC 비교](artifacts/roc_curve.png)
+![분류 ROC-AUC 비교](artifacts/final/roc_curve.png)
 
-![선택된 Logistic 0.45와 Tuned RF 0.33 혼동행렬](artifacts/confusion_matrix.png)
+![선택된 Logistic 0.45와 Tuned RF 0.33 혼동행렬](artifacts/final/confusion_matrix.png)
 
 ## 주요 회귀 결과
 
@@ -64,25 +64,25 @@ uv run python -m pytest -v
 
 Ridge(L2)는 모든 계수를 연속적으로 축소하고, Lasso(L1)는 강한 규제에서 일부 계수를 0으로 만들 수 있습니다. 이 데이터에서는 둘 다 유사한 holdout 성능을 내며, alpha가 커질수록 Lasso 계수가 빠르게 줄어드는 것을 확인할 수 있습니다.
 
-![Ridge와 Lasso 계수 경로](artifacts/regularization_coefficients.png)
+![Ridge와 Lasso 계수 경로](artifacts/experiment/regularization_coefficients.png)
 
 ## 모델 해석과 운영 시나리오
 
 Tuned RF의 feature importance는 `annual_income`, `overdue_count_6m`, `debt_ratio` 순으로 높습니다. 이는 가상 데이터의 생성 규칙과 일치하지만, 이 값은 RF의 impurity 기반 중요도이므로 인과관계나 실제 금융 변수의 공정성을 뜻하지 않습니다. 실제 적용 전에는 permutation importance, 공정성, 시간 기준 검증이 추가로 필요합니다.
 
-![Tuned RF 특징 중요도](artifacts/feature_importance.png)
+![Tuned RF 특징 중요도](artifacts/experiment/feature_importance.png)
 
 오탐(FP)은 정상 고객의 추가 심사를 늘리고, 미탐(FN)은 연체 위험을 놓칠 수 있습니다. 연체 고객을 놓치는 False Negative의 비용을 더 중요하게 보아, 기본 `0.50`보다 보수적인 `0.45` threshold를 선택했습니다. Logistic Train OOF 기준 Recall은 `93.13% → 94.59%`로 증가했으며, 이에 따른 Precision 감소와 False Positive 증가를 의도적으로 수용했습니다. 이 선택에는 Train OOF probability만 사용했고, Holdout에는 `0.45`를 한 번 적용해 최종 성능을 확인했습니다.
 
-![Logistic Train OOF threshold sweep](artifacts/logistic_threshold_sweep.png)
+![Logistic Train OOF threshold sweep](artifacts/experiment/logistic_threshold_sweep.png)
 
 Tuned Random Forest는 `n_estimators=100` 설정에서 Logistic과 비슷한 OOF Recall 조건을 맞추기 위해 `0.33` threshold를 선택했습니다. Logistic `0.45`의 OOF Recall `94.59%`와 RF `0.33`의 `94.48%`는 0.10%p 차이입니다. 이 조건에서 Logistic은 RF보다 FP가 `83`건 적고 Precision/F1도 `44.56%`/`0.6058` 대 `42.79%`/`0.5890`으로 높습니다. Holdout에는 선택 후 각각 한 번만 적용했으며, Logistic Recall/F1은 `93.33%`/`0.6013`, RF는 `91.25%`/`0.5725`였습니다. 따라서 OOF의 유사 Recall 조건이 Holdout에서 완전히 재현된다고 해석하지 않습니다.
 
-![Tuned Random Forest Train OOF threshold sweep](artifacts/random_forest_threshold_sweep.png)
+![Tuned Random Forest Train OOF threshold sweep](artifacts/experiment/random_forest_threshold_sweep.png)
 
-Tuned Random Forest는 `n_estimators=100`을 선택했습니다. 200개로 늘리면 Train 5-fold CV ROC-AUC가 `0.948000 → 0.948212`로 `0.000212`만 상승하고 F1은 오히려 `0.656051 → 0.655971`로 소폭 낮아졌습니다. 트리 수와 모델 저장 공간도 대체로 두 배가 되므로, 이 작은 ROC-AUC 차이보다 비용 효율을 우선해 100개를 사용합니다. 학습·배치 예측 시간은 환경에 따라 달라지므로 [`metrics.json`](artifacts/metrics.json)의 `benchmark` 구역만 기준으로 삼으며, 실제 단건 서비스 지연시간으로 해석하지 않습니다.
+Tuned Random Forest는 `n_estimators=100`을 선택했습니다. 200개로 늘리면 Train 5-fold CV ROC-AUC가 `0.948000 → 0.948212`로 `0.000212`만 상승하고 F1은 오히려 `0.656051 → 0.655971`로 소폭 낮아졌습니다. 트리 수와 모델 저장 공간도 대체로 두 배가 되므로, 이 작은 ROC-AUC 차이보다 비용 효율을 우선해 100개를 사용합니다. 학습·배치 예측 시간은 환경에 따라 달라지므로 [`experiment.json`](artifacts/experiment/experiment.json)의 experiment evidence만 기준으로 삼으며, 실제 단건 서비스 지연시간으로 해석하지 않습니다.
 
-![랜덤 포레스트 트리 수 민감도](artifacts/random_forest_n_estimators_curve.png)
+![랜덤 포레스트 트리 수 민감도](artifacts/experiment/random_forest_n_estimators_curve.png)
 
 ## 프로젝트 구조
 

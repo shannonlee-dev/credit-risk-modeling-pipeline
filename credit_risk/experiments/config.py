@@ -8,6 +8,7 @@ import numpy as np
 @dataclass(frozen=True)
 class ClassificationExperimentConfig:
     logistic_c_values: tuple[float, ...]
+    rf_grid_n_estimators_values: tuple[int, ...]
     rf_max_depth_values: tuple[int | None, ...]
     rf_min_samples_split_values: tuple[int, ...]
     rf_n_estimators_values: tuple[int, ...]
@@ -31,6 +32,7 @@ FULL_EXPERIMENT = ExperimentProfile(
     name="full",
     classification=ClassificationExperimentConfig(
         logistic_c_values=(0.001, 0.003, 0.01, 0.03, 0.1),
+        rf_grid_n_estimators_values=(100,),
         rf_max_depth_values=(None, 8, 16),
         rf_min_samples_split_values=(5, 10, 20, 40, 80),
         rf_n_estimators_values=(25, 50, 100, 200, 300, 500),
@@ -42,6 +44,7 @@ SMOKE_EXPERIMENT = ExperimentProfile(
     name="smoke",
     classification=ClassificationExperimentConfig(
         logistic_c_values=(0.01, 0.1),
+        rf_grid_n_estimators_values=(100,),
         rf_max_depth_values=(None, 8, 16),
         rf_min_samples_split_values=(20, 40),
         rf_n_estimators_values=(50, 100),
