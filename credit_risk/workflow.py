@@ -34,9 +34,6 @@ from credit_risk.reporting import (
     save_regression_artifacts,
 )
 
-_METRICS_FILENAME = "metrics.json"
-
-
 def _protocol_fingerprint(profile: ExperimentProfile) -> str:
     payload = json.dumps(
         {
@@ -164,7 +161,7 @@ def run_final_evaluation(
             for name, values in result["regression"]["test_metrics"].items()
         },
     }
-    (destination / _METRICS_FILENAME).write_text(json.dumps(_json_ready(metrics), ensure_ascii=False, indent=2), encoding="utf-8")
+    (destination / "metrics.json").write_text(json.dumps(_json_ready(metrics), ensure_ascii=False, indent=2), encoding="utf-8")
     result["classification"]["predictions"].to_csv(destination / "classification_predictions.csv", index=False)
     pd.DataFrame({"actual_credit_score": regression_split[3].to_numpy(), **{name: values.to_numpy() for name, values in result["regression"]["predictions"].items()}}).to_csv(destination / "credit_score_predictions.csv", index=False)
     save_final_artifacts(result, destination)
@@ -186,7 +183,6 @@ def run_all(
     selection_path = Path(output_dir) / "experiment" / "selection.json"
     selection_path.write_text(json.dumps(selection, ensure_ascii=False, indent=2), encoding="utf-8")
     return run_final_evaluation(data_path, selection_path, output_dir, profile)
-
 
 def run_classification(
     x_train: pd.DataFrame,
@@ -248,5 +244,5 @@ def run_analysis(
         ),
         "regression": run_regression(*regression_split, destination),
     }
-    save_metrics_report(result, destination / _METRICS_FILENAME)
+    save_metrics_report(result, destination / "metrics.json")
     return result

@@ -7,14 +7,10 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from credit_risk.constants import (
-    CATEGORICAL_FEATURES,
     CLASSIFICATION_TARGET,
     FEATURE_COLUMNS,
-    NUMERIC_FEATURES,
     RANDOM_STATE,
     REGRESSION_TARGET,
-    REQUIRED_COLUMNS,
-    TARGET_COLUMNS,
 )
 
 
@@ -31,7 +27,12 @@ def load_and_validate_data(path: str | Path) -> pd.DataFrame:
         )
 
     df = pd.read_csv(data_path)
-    missing = sorted(set(REQUIRED_COLUMNS) - set(df.columns))
+    required_columns = [
+        *FEATURE_COLUMNS,
+        REGRESSION_TARGET,
+        CLASSIFICATION_TARGET,
+    ]
+    missing = sorted(set(required_columns) - set(df.columns))
     if missing:
         raise ValueError(f"누락된 필수 열: {', '.join(missing)}")
     return df

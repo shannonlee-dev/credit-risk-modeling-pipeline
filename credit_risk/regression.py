@@ -15,10 +15,8 @@ from credit_risk.constants import (
     CREDIT_SCORE_MAX,
     CREDIT_SCORE_MIN,
     CV_FOLDS,
-    LASSO_MODEL,
-    RIDGE_MODEL,
     RANDOM_STATE,
-    REGRESSION_ALPHAS as ALPHAS,
+    REGRESSION_ALPHAS,
     REGRESSION_MODELS,
 )
 from credit_risk.preprocessing import build_preprocessor
@@ -26,16 +24,13 @@ from credit_risk.evaluation import evaluate_regression
 from credit_risk.results import FinalSelection
 
 
-_LASSO_MAX_ITERATIONS = 20_000
-
-
 def _regularized_pipeline(model_name: str, alpha: float) -> Pipeline:
-    if model_name == RIDGE_MODEL:
+    if model_name == "Ridge":
         estimator = Ridge(alpha=alpha)
     else:
         estimator = Lasso(
             alpha=alpha,
-            max_iter=_LASSO_MAX_ITERATIONS,
+            max_iter=20_000,
             random_state=RANDOM_STATE,
         )
     return Pipeline(
@@ -62,7 +57,7 @@ def train_regression(
     }
 
     for model_name in REGRESSION_MODELS:
-        for alpha in ALPHAS:
+        for alpha in REGRESSION_ALPHAS:
             pipeline = _regularized_pipeline(model_name, alpha)
             scores = cross_val_score(
                 pipeline,
@@ -133,8 +128,8 @@ def evaluate_final_regression(
 ) -> dict:
     """Fit selected regularized regressors and evaluate untouched Holdout once."""
     selected_alpha = {
-        RIDGE_MODEL: selection.ridge_alpha,
-        LASSO_MODEL: selection.lasso_alpha,
+        "Ridge": selection.ridge_alpha,
+        "Lasso": selection.lasso_alpha,
     }
     metrics = {}
     predictions = {}

@@ -12,35 +12,15 @@ DEFAULT_DATA_PATH = Path("data/generated/finance_data.csv")
 DEFAULT_ARTIFACTS_DIR = Path("artifacts")
 
 # Dataset schema
-AGE_COLUMN = "age"
-ANNUAL_INCOME_COLUMN = "annual_income"
-SPENDING_SCORE_COLUMN = "spending_score"
-DEBT_RATIO_COLUMN = "debt_ratio"
-OVERDUE_COUNT_COLUMN = "overdue_count_6m"
-CREDIT_CARD_COUNT_COLUMN = "credit_card_count"
 REGRESSION_TARGET = "credit_score"
 CLASSIFICATION_TARGET = "is_overdue"
 FEATURE_COLUMNS = [
-    AGE_COLUMN,
-    ANNUAL_INCOME_COLUMN,
-    SPENDING_SCORE_COLUMN,
-    DEBT_RATIO_COLUMN,
-    OVERDUE_COUNT_COLUMN,
-    CREDIT_CARD_COUNT_COLUMN,
-]
-NUMERIC_FEATURES = FEATURE_COLUMNS.copy()
-CATEGORICAL_FEATURES: list[str] = []
-TARGET_COLUMNS = [REGRESSION_TARGET, CLASSIFICATION_TARGET]
-REQUIRED_COLUMNS = FEATURE_COLUMNS + TARGET_COLUMNS
-DATASET_COLUMNS = [
-    AGE_COLUMN,
-    ANNUAL_INCOME_COLUMN,
-    SPENDING_SCORE_COLUMN,
-    DEBT_RATIO_COLUMN,
-    CREDIT_CARD_COUNT_COLUMN,
-    OVERDUE_COUNT_COLUMN,
-    REGRESSION_TARGET,
-    CLASSIFICATION_TARGET,
+    "age",
+    "annual_income",
+    "spending_score",
+    "debt_ratio",
+    "overdue_count_6m",
+    "credit_card_count",
 ]
 
 # Shared model constraints and identifiers
@@ -52,7 +32,5 @@ LOGISTIC_REGRESSION_MODEL = "Logistic Regression"
 DECISION_TREE_MODEL = "Decision Tree"
 RANDOM_FOREST_MODEL = "Random Forest"
 TUNED_RANDOM_FOREST_MODEL = "Random Forest (Tuned)"
-RIDGE_MODEL = "Ridge"
-LASSO_MODEL = "Lasso"
-REGRESSION_MODELS = (RIDGE_MODEL, LASSO_MODEL)
+REGRESSION_MODELS = ("Ridge", "Lasso")
 REGRESSION_ALPHAS = [0.01, 0.1, 1, 10, 100]

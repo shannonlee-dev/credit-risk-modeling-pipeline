@@ -12,9 +12,7 @@ from credit_risk.classification import rule_based_predict
 from credit_risk.evaluation import apply_threshold, evaluate_thresholds
 from credit_risk.results import FinalSelection
 from credit_risk.data import (
-    CATEGORICAL_FEATURES,
     FEATURE_COLUMNS,
-    NUMERIC_FEATURES,
     class_distribution,
     load_and_validate_data,
     split_classification_data,
@@ -35,7 +33,6 @@ def finance_df(tmp_path_factory):
 def test_classification_split_prevents_target_leakage(finance_df):
     x_train, x_test, y_train, y_test = split_classification_data(finance_df)
 
-    assert FEATURE_COLUMNS == NUMERIC_FEATURES + CATEGORICAL_FEATURES
     assert "credit_score" not in x_train.columns
     assert "is_overdue" not in x_train.columns
     assert len(x_train) == 8_000
@@ -205,6 +202,8 @@ def test_final_evaluators_use_selected_settings_without_experiment_calls(
     assert classification["selected_model"] == "Logistic Regression"
     assert classification["selected_threshold"] == 0.44
     assert classification["predictions"]["logistic_prediction"].isin([0, 1]).all()
+    assert "Decision Tree" in classification["metrics"]
+    assert classification["predictions"]["decision_tree_prediction"].isin([0, 1]).all()
     assert set(regression["test_metrics"]) == {"Ridge", "Lasso"}
     assert all(predictions.between(0, 1000).all() for predictions in regression["predictions"].values())
 

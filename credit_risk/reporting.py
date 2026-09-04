@@ -35,7 +35,6 @@ from credit_risk.constants import (
 
 
 _PLOT_DPI = 150
-_MAX_CONFUSION_MATRIX_COLUMNS = 2
 
 
 def _classification_confusion_predictions(
@@ -60,7 +59,7 @@ def _save_confusion_matrices(
     predictions: dict[str, np.ndarray],
     output_path: Path,
 ) -> None:
-    columns = min(_MAX_CONFUSION_MATRIX_COLUMNS, len(predictions))
+    columns = min(2, len(predictions))
     rows = int(np.ceil(len(predictions) / columns))
     figure, axes = plt.subplots(rows, columns, figsize=(5 * columns, 4 * rows))
     for axis, (name, values) in zip(np.asarray(axes).reshape(-1), predictions.items()):
@@ -429,7 +428,25 @@ def save_final_artifacts(result: dict, output_dir: str | Path) -> None:
         {
             RULE_BASELINE_MODEL: table["rule_prediction"].to_numpy(dtype=float),
             LOGISTIC_REGRESSION_MODEL: table["logistic_probability"].to_numpy(),
+            DECISION_TREE_MODEL: table["decision_tree_probability"].to_numpy(),
             TUNED_RANDOM_FOREST_MODEL: table["random_forest_probability"].to_numpy(),
         },
         destination / "roc_curve.png",
     )
+    labels = {
+        RULE_BASELINE_MODEL: "Rule Baseline",
+        LOGISTIC_REGRESSION_MODEL: "Logistic Regression",
+        DECISION_TREE_MODEL: "Decision Tree",
+        TUNED_RANDOM_FOREST_MODEL: "Tuned Random Forest",
+    }
+    pd.DataFrame(
+        [
+            {
+                "Model": labels[name],
+                "Accuracy": metrics["accuracy"],
+                "F1-Score": metrics["f1"],
+                "AUC": metrics["roc_auc"],
+            }
+            for name, metrics in result["classification"]["metrics"].items()
+        ]
+    ).to_csv(destination / "classification_metrics_comparison.csv", index=False)

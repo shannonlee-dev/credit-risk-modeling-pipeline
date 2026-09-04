@@ -5,7 +5,7 @@ import sys
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-from scripts.generate_data import EXPECTED_COLUMNS, generate_finance_data
+from scripts.generate_data import generate_finance_data
 
 
 def test_root_data_gen_script_generates_default_dataset(tmp_path):
@@ -30,7 +30,16 @@ def test_generate_finance_data_is_reproducible(tmp_path):
     second = generate_finance_data(tmp_path / "second.csv")
 
     assert first.shape == (10_000, 8)
-    assert list(first.columns) == EXPECTED_COLUMNS
+    assert list(first.columns) == [
+        "age",
+        "annual_income",
+        "spending_score",
+        "debt_ratio",
+        "credit_card_count",
+        "overdue_count_6m",
+        "credit_score",
+        "is_overdue",
+    ]
     assert 0.10 <= first["is_overdue"].mean() <= 0.15
     assert first["credit_score"].between(0, 1000).all()
     assert (tmp_path / "first.csv").is_file()
