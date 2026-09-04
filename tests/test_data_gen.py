@@ -1,6 +1,28 @@
+from pathlib import Path
+import subprocess
+import sys
+
+import pandas as pd
 from pandas.testing import assert_frame_equal
 
 from scripts.generate_data import EXPECTED_COLUMNS, generate_finance_data
+
+
+def test_root_data_gen_script_generates_default_dataset(tmp_path):
+    project_root = Path(__file__).resolve().parents[1]
+
+    completed = subprocess.run(
+        [sys.executable, str(project_root / "data_gen.py")],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    output_path = tmp_path / "data" / "generated" / "finance_data.csv"
+    assert completed.returncode == 0, completed.stderr
+    assert output_path.is_file()
+    assert len(pd.read_csv(output_path)) == 10_000
 
 
 def test_generate_finance_data_is_reproducible(tmp_path):
