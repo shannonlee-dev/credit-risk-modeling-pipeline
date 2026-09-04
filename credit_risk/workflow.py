@@ -31,7 +31,7 @@ from credit_risk.regression import (
     evaluate_final_regression,
 )
 from credit_risk.results import FinalSelection
-from credit_risk.selection import PROJECT_DEFAULT_SELECTION
+from credit_risk.selection import PROJECT_SELECTION_POLICY
 from credit_risk.regression import train_regression
 from credit_risk.reporting import (
     save_experiment_artifacts,
@@ -84,17 +84,17 @@ def _selection_template(experiment: dict) -> dict:
 def resolve_default_selection(experiment: dict) -> dict:
     """Resolve the repository-approved reproducibility selection."""
     selection = _selection_template(experiment)
-    selection["classification"]["selected_model"] = PROJECT_DEFAULT_SELECTION[
+    selection["classification"]["selected_model"] = PROJECT_SELECTION_POLICY[
         "selected_model"
     ]
     selection["classification"]["logistic_regression"]["threshold"] = (
-        PROJECT_DEFAULT_SELECTION["logistic_threshold"]
+        PROJECT_SELECTION_POLICY["logistic_threshold"]
     )
     selection["classification"]["random_forest"]["n_estimators"] = (
-        PROJECT_DEFAULT_SELECTION["random_forest_n_estimators"]
+        PROJECT_SELECTION_POLICY["random_forest_n_estimators"]
     )
     selection["classification"]["random_forest"]["threshold"] = (
-        PROJECT_DEFAULT_SELECTION["random_forest_threshold"]
+        PROJECT_SELECTION_POLICY["random_forest_threshold"]
     )
     return selection
 
@@ -215,11 +215,6 @@ def _run_all_stages(
 ) -> tuple[dict, dict]:
     experiment = run_experiment(data_path, output_dir, profile)
     raw_selection = resolve_default_selection(experiment)
-    selection_path = Path(output_dir) / "experiment" / "selection.json"
-    selection_path.write_text(
-        json.dumps(raw_selection, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
     final = _run_final_evaluation(
         data_path,
         raw_selection,

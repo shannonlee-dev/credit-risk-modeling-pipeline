@@ -23,7 +23,19 @@ uv run python -m pytest -v
 
 `pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. 데이터 생성 진입점은 `scripts/generate_data.py` 하나이며, `data/generated/finance_data.csv`와 예측 CSV는 생성 파일이라 Git에서 제외됩니다.
 
-권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 dataset/protocol fingerprint가 일치하는 selection으로 Holdout을 한 번만 평가합니다. `python train.py`, `python train.py all`, `run_analysis()`는 같은 두 단계 primitive와 `credit_risk.selection.PROJECT_DEFAULT_SELECTION`을 쓰는 편의 재현 경로입니다. `--profile smoke`와 legacy `fast=True`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
+권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 명시적으로 제공한 selection과 dataset/protocol fingerprint가 일치하는지 확인한 뒤 Holdout을 한 번만 평가합니다. `final`의 selection source는 `selection.json` 하나입니다. `python train.py`, `python train.py all`, `run_analysis()`는 이번 experiment 결과의 technical hyperparameter와 `credit_risk.selection.PROJECT_SELECTION_POLICY`를 합쳐 repository-approved policy를 재현하는 편의 경로입니다. `all`은 user-provided selection file을 받지 않습니다. `--profile smoke`와 legacy `fast=True`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
+
+CLI contract:
+
+```bash
+# Human-in-the-loop final evaluation
+python train.py experiment
+python train.py final --selection artifacts/experiment/selection.json
+
+# Repository-approved policy reproduction
+python train.py
+python train.py all
+```
 
 ## 평가 대상
 

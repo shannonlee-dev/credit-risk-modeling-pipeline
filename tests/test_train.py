@@ -604,7 +604,7 @@ def test_run_analysis_uses_two_stage_artifacts_and_preserves_legacy_result(
     }
 
 
-def test_project_default_selection_resolves_approved_values_from_experiment():
+def test_project_selection_policy_resolves_approved_values_from_experiment():
     from credit_risk import selection as project_selection
     from credit_risk import workflow
 
@@ -627,7 +627,7 @@ def test_project_default_selection_resolves_approved_values_from_experiment():
 
     selection = workflow.resolve_default_selection(experiment)
 
-    assert project_selection.PROJECT_DEFAULT_SELECTION == {
+    assert project_selection.PROJECT_SELECTION_POLICY == {
         "selected_model": "Logistic Regression",
         "logistic_threshold": 0.45,
         "random_forest_n_estimators": 100,
@@ -644,6 +644,28 @@ def test_project_default_selection_resolves_approved_values_from_experiment():
             "threshold": 0.33,
         },
     }
+
+
+def test_cli_selection_ownership():
+    from train import build_parser
+
+    parser = build_parser()
+
+    assert parser.parse_args([]).command == "all"
+    assert parser.parse_args(["experiment"]).command == "experiment"
+    assert parser.parse_args(["all"]).command == "all"
+    assert parser.parse_args(["--profile", "smoke", "all"]).profile == "smoke"
+    assert (
+        parser.parse_args(["final", "--selection", "selection.json"]).selection
+        == "selection.json"
+    )
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["final"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["all", "--selection", "selection.json"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["experiment", "--selection", "selection.json"])
 
 
 def test_training_computation_does_not_write_artifacts(
