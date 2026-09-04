@@ -1,12 +1,12 @@
 # Experiment / Final Evaluation Architecture Refactor
 
-## 1. Current architecture summary
+## 1. Pre-refactor architecture summary
 
 현재 파이프라인은 재현 가능하고 전처리 누수 방지라는 중요한 성질을 갖지만, Train-only model selection과 untouched holdout 평가가 한 번의 `train_classification()`/`train_regression()` 호출에 결합되어 있다. `workflow.run_analysis()`는 이 혼합 결과를 단일 `artifacts/`에 저장한다. 따라서 통계적 순서는 현재도 대체로 올바르지만, 함수 signature·artifact·CLI만으로는 두 lifecycle을 구분할 수 없다.
 
 `data_gen.py`는 저장소에 없다. 실제 데이터 생성 진입점은 `scripts/generate_data.py`이며 `N_SAMPLES = 10_000`, `RANDOM_STATE = 42`다.
 
-## 2. Current call/data flow
+## 2. Pre-refactor call/data flow
 
 ```text
 python train.py
@@ -23,7 +23,7 @@ python train.py
         -> regression.train_regression(..., x_test, y_test)
            -> Train CV alpha scan -> full-Train fit -> Holdout metrics
         -> reporting.save_regression_artifacts(result, y_test, output_dir)
-     -> reporting.save_metrics_report(mixed_result, artifacts/metrics.json)
+     -> legacy root metrics serialization (removed)
 ```
 
 - `classification.train_classification()` constructs Logistic and RF `Pipeline`s, fits Logistic/RF on Train before and after selection as needed, runs Logistic CV and RF `GridSearchCV` on Train, generates OOF probabilities with `cross_val_predict`, then predicts the Holdout. Rule predictions are created directly from `x_test`.
@@ -148,7 +148,7 @@ load + same deterministic split
 | `evaluate_classifier` | `evaluation.evaluate_classification` | Pure scoring after predictions exist. |
 | `_average_latency_ms` | `experiments.classification.average_latency_ms` | Comparative experiment benchmark. |
 | `_feature_importance` | `experiments.classification.feature_importance` | RF interpretation evidence. |
-| `_threshold_sweep` | `experiments.thresholds.evaluate_thresholds` | Pure table; remove annotation flags. |
+| `_threshold_sweep` | `evaluation.evaluate_thresholds` | Pure table; remove annotation flags. |
 | `_random_forest_saturation_analysis` | `experiments.classification.analyze_rf_tree_counts` | Train-only sensitivity. |
 | `_analyze_logistic_c_values` | `experiments.classification.analyze_logistic_c_values` | Train-only selection. |
 | `_selected_threshold_metrics` | experiment-result summary helper | Derives evidence, not final decision. |

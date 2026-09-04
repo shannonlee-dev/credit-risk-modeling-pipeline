@@ -1,6 +1,5 @@
 """Plots and serialized artifacts for completed model experiments."""
 
-import json
 import os
 from pathlib import Path
 import tempfile
@@ -331,67 +330,6 @@ def save_regression_artifacts(
     prediction_table.to_csv(
         final_destination / "credit_score_predictions.csv",
         index=False,
-    )
-
-
-def _without_timing(value):
-    if isinstance(value, dict):
-        return {
-            key: _without_timing(child)
-            for key, child in value.items()
-            if key not in {"batch_prediction_latency_ms", "fit_time_seconds"}
-        }
-    if isinstance(value, list):
-        return [_without_timing(child) for child in value]
-    return value
-
-
-def metrics_report(result: dict) -> dict:
-    """Serialize stable evaluation data and one benchmark summary."""
-    classification = result["classification"]
-    saturation = classification["random_forest_saturation"]
-    return {
-        "data_distribution": result["data_distribution"],
-        "classification": _without_timing({
-            key: value
-            for key, value in classification.items()
-            if key
-            not in {
-                "predictions",
-                "logistic_threshold_sweep",
-                "random_forest_threshold_sweep",
-                "latency_benchmark",
-            }
-        }),
-        "regression": {
-            key: value
-            for key, value in result["regression"].items()
-            if key != "predictions"
-        },
-        "benchmark": {
-            **classification["latency_benchmark"],
-            "model_prediction_latency_ms": {
-                name: metrics["batch_prediction_latency_ms"]
-                for name, metrics in classification["metrics"].items()
-            },
-            "random_forest_tree_count": {
-                n_estimators: {
-                    "fit_time_seconds": values["fit_time_seconds"],
-                    "batch_prediction_latency_ms": values[
-                        "batch_prediction_latency_ms"
-                    ],
-                }
-                for n_estimators, values in saturation.items()
-            },
-        },
-    }
-
-
-def save_metrics_report(result: dict, output_path: str | Path) -> None:
-    """Serialize experiment metrics as UTF-8 JSON."""
-    Path(output_path).write_text(
-        json.dumps(metrics_report(result), ensure_ascii=False, indent=2),
-        encoding="utf-8",
     )
 
 
