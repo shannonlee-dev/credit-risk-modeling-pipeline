@@ -296,6 +296,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
     assert set(result["metrics"]) == {
         "Rule Baseline",
         "Logistic Regression",
+        "Decision Tree",
         "Random Forest",
         "Random Forest (Tuned)",
     }
@@ -425,6 +426,47 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "source": "training_feature_batch",
     }
     assert (output_dir / "classification_predictions.csv").is_file()
+    comparison = pd.read_csv(output_dir / "classification_metrics_comparison.csv")
+    assert comparison.to_dict(orient="records") == [
+        {
+            "Model": "Rule Baseline",
+            "Accuracy": pytest.approx(result["metrics"]["Rule Baseline"]["accuracy"]),
+            "F1-Score": pytest.approx(result["metrics"]["Rule Baseline"]["f1"]),
+            "AUC": pytest.approx(result["metrics"]["Rule Baseline"]["roc_auc"]),
+        },
+        {
+            "Model": "Logistic Regression",
+            "Accuracy": pytest.approx(
+                result["metrics"]["Logistic Regression"]["accuracy"]
+            ),
+            "F1-Score": pytest.approx(result["metrics"]["Logistic Regression"]["f1"]),
+            "AUC": pytest.approx(result["metrics"]["Logistic Regression"]["roc_auc"]),
+        },
+        {
+            "Model": "Decision Tree",
+            "Accuracy": pytest.approx(result["metrics"]["Decision Tree"]["accuracy"]),
+            "F1-Score": pytest.approx(result["metrics"]["Decision Tree"]["f1"]),
+            "AUC": pytest.approx(result["metrics"]["Decision Tree"]["roc_auc"]),
+        },
+        {
+            "Model": "Random Forest",
+            "Accuracy": pytest.approx(result["metrics"]["Random Forest"]["accuracy"]),
+            "F1-Score": pytest.approx(result["metrics"]["Random Forest"]["f1"]),
+            "AUC": pytest.approx(result["metrics"]["Random Forest"]["roc_auc"]),
+        },
+        {
+            "Model": "Tuned Random Forest",
+            "Accuracy": pytest.approx(
+                result["metrics"]["Random Forest (Tuned)"]["accuracy"]
+            ),
+            "F1-Score": pytest.approx(
+                result["metrics"]["Random Forest (Tuned)"]["f1"]
+            ),
+            "AUC": pytest.approx(
+                result["metrics"]["Random Forest (Tuned)"]["roc_auc"]
+            ),
+        },
+    ]
     for name in [
         "confusion_matrix.png",
         "roc_curve.png",

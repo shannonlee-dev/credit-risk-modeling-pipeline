@@ -24,6 +24,7 @@ from matplotlib import pyplot as plt  # noqa: E402
 
 from credit_risk.constants import (
     DEFAULT_CLASSIFICATION_THRESHOLD,
+    DECISION_TREE_MODEL,
     LOGISTIC_REGRESSION_MODEL,
     RANDOM_FOREST_MODEL,
     REGRESSION_ALPHAS,
@@ -227,6 +228,7 @@ def save_classification_artifacts(
         {
             RULE_BASELINE_MODEL: table["rule_prediction"].to_numpy(dtype=float),
             LOGISTIC_REGRESSION_MODEL: table["logistic_probability"].to_numpy(),
+            DECISION_TREE_MODEL: table["decision_tree_probability"].to_numpy(),
             RANDOM_FOREST_MODEL: table["random_forest_probability"].to_numpy(),
             TUNED_RANDOM_FOREST_MODEL: table["overdue_probability"].to_numpy(),
         },
@@ -261,6 +263,40 @@ def save_classification_artifacts(
         destination / "random_forest_threshold_sweep.png",
         "Tuned Random Forest",
     )
+    pd.DataFrame(
+        [
+            {
+                "Model": "Rule Baseline",
+                "Accuracy": result["metrics"][RULE_BASELINE_MODEL]["accuracy"],
+                "F1-Score": result["metrics"][RULE_BASELINE_MODEL]["f1"],
+                "AUC": result["metrics"][RULE_BASELINE_MODEL]["roc_auc"],
+            },
+            {
+                "Model": "Logistic Regression",
+                "Accuracy": result["metrics"][LOGISTIC_REGRESSION_MODEL]["accuracy"],
+                "F1-Score": result["metrics"][LOGISTIC_REGRESSION_MODEL]["f1"],
+                "AUC": result["metrics"][LOGISTIC_REGRESSION_MODEL]["roc_auc"],
+            },
+            {
+                "Model": "Decision Tree",
+                "Accuracy": result["metrics"][DECISION_TREE_MODEL]["accuracy"],
+                "F1-Score": result["metrics"][DECISION_TREE_MODEL]["f1"],
+                "AUC": result["metrics"][DECISION_TREE_MODEL]["roc_auc"],
+            },
+            {
+                "Model": "Random Forest",
+                "Accuracy": result["metrics"][RANDOM_FOREST_MODEL]["accuracy"],
+                "F1-Score": result["metrics"][RANDOM_FOREST_MODEL]["f1"],
+                "AUC": result["metrics"][RANDOM_FOREST_MODEL]["roc_auc"],
+            },
+            {
+                "Model": "Tuned Random Forest",
+                "Accuracy": result["metrics"][TUNED_RANDOM_FOREST_MODEL]["accuracy"],
+                "F1-Score": result["metrics"][TUNED_RANDOM_FOREST_MODEL]["f1"],
+                "AUC": result["metrics"][TUNED_RANDOM_FOREST_MODEL]["roc_auc"],
+            },
+        ]
+    ).to_csv(destination / "classification_metrics_comparison.csv", index=False)
     table.to_csv(destination / "classification_predictions.csv", index=False)
 
 
