@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 # Reproducibility and evaluation
 RANDOM_STATE = 42
 CV_FOLDS = 5

@@ -1,16 +1,14 @@
+import inspect
 import json
 import os
 import subprocess
 import sys
-import inspect
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from credit_risk.classification import rule_based_predict
-from credit_risk.evaluation import apply_threshold, evaluate_thresholds
-from credit_risk.results import FinalSelection
 from credit_risk.data import (
     FEATURE_COLUMNS,
     class_distribution,
@@ -18,10 +16,12 @@ from credit_risk.data import (
     split_classification_data,
     split_regression_data,
 )
+from credit_risk.evaluation import apply_threshold, evaluate_thresholds
+from credit_risk.generate_data import generate_finance_data
 from credit_risk.preprocessing import build_preprocessor
 from credit_risk.reporting import _classification_confusion_predictions
+from credit_risk.results import FinalSelection
 from credit_risk.workflow import run_analysis, run_classification, run_regression
-from scripts.generate_data import generate_finance_data
 
 
 @pytest.fixture(scope="module")
@@ -152,10 +152,14 @@ def test_train_only_experiments_do_not_accept_holdout_data(finance_df):
     )
 
     assert set(inspect.signature(run_classification_experiment).parameters) == {
-        "x_train", "y_train", "config"
+        "x_train",
+        "y_train",
+        "config",
     }
     assert set(inspect.signature(run_regression_experiment).parameters) == {
-        "x_train", "y_train", "config"
+        "x_train",
+        "y_train",
+        "config",
     }
     assert "metrics" not in classification
     assert "test_metrics" not in regression
@@ -195,9 +199,7 @@ def test_final_evaluators_use_selected_settings_without_experiment_calls(
     classification = evaluate_final_classification(
         *split_classification_data(finance_df.head(400)), selection
     )
-    regression = evaluate_final_regression(
-        *split_regression_data(finance_df.head(400)), selection
-    )
+    regression = evaluate_final_regression(*split_regression_data(finance_df.head(400)), selection)
 
     assert classification["selected_model"] == "Logistic Regression"
     assert classification["selected_threshold"] == 0.44
@@ -205,9 +207,12 @@ def test_final_evaluators_use_selected_settings_without_experiment_calls(
     assert "Decision Tree" in classification["metrics"]
     assert classification["predictions"]["decision_tree_prediction"].isin([0, 1]).all()
     assert set(regression["test_metrics"]) == {"Ridge", "Lasso"}
-    assert all(predictions.between(0, 1000).all() for predictions in regression["predictions"].values())
+    assert all(
+        predictions.between(0, 1000).all() for predictions in regression["predictions"].values()
+    )
 
 
+@pytest.mark.smoke
 def test_two_stage_workflow_separates_experiment_and_final_artifacts(
     finance_df,
     tmp_path,
@@ -226,9 +231,7 @@ def test_two_stage_workflow_separates_experiment_and_final_artifacts(
     selection_path = output_dir / "experiment" / "selection.json"
     selection_path.write_text(json.dumps(selection), encoding="utf-8")
 
-    final = run_final_evaluation(
-        data_path, selection_path, output_dir, SMOKE_EXPERIMENT
-    )
+    final = run_final_evaluation(data_path, selection_path, output_dir, SMOKE_EXPERIMENT)
 
     assert experiment["profile"] == "smoke"
     assert (output_dir / "experiment" / "experiment.json").is_file()
@@ -326,10 +329,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
     assert result["selected_logistic_c"] in {0.001, 0.003, 0.01, 0.03, 0.1}
     assert result["selected_classification_model"] == "Logistic Regression"
     assert result["best_params"]["model__max_depth"] in {None, 8, 16}
-    assert (
-        result["best_params"]["model__min_samples_split"]
-        in {5, 10, 20, 40, 80}
-    )
+    assert result["best_params"]["model__min_samples_split"] in {5, 10, 20, 40, 80}
     grid_analysis = result["random_forest_grid_analysis"]
     assert set(grid_analysis) == {
         f"max_depth={max_depth}, min_samples_split={min_samples_split}"
@@ -368,28 +368,18 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "recall",
         "f1",
     ]
-    assert sweep["threshold"].tolist() == pytest.approx(
-        np.linspace(0.30, 0.60, 31)
-    )
+    assert sweep["threshold"].tolist() == pytest.approx(np.linspace(0.30, 0.60, 31))
     baseline = sweep.loc[sweep["is_baseline"]]
     assert len(baseline) == 1
     assert baseline.iloc[0]["threshold"] == 0.50
     selected = sweep.loc[sweep["is_selected"]]
     assert len(selected) == 1
-    assert (
-        selected.iloc[0]["threshold"]
-        == result["selected_logistic_threshold"]
-        == 0.45
-    )
+    assert selected.iloc[0]["threshold"] == result["selected_logistic_threshold"] == 0.45
     random_forest_sweep = result["random_forest_threshold_sweep"]
     assert list(random_forest_sweep) == list(sweep)
-    assert random_forest_sweep["threshold"].tolist() == pytest.approx(
-        np.linspace(0.30, 0.60, 31)
-    )
+    assert random_forest_sweep["threshold"].tolist() == pytest.approx(np.linspace(0.30, 0.60, 31))
     assert len(random_forest_sweep.loc[random_forest_sweep["is_baseline"]]) == 1
-    selected_random_forest = random_forest_sweep.loc[
-        random_forest_sweep["is_selected"]
-    ]
+    selected_random_forest = random_forest_sweep.loc[random_forest_sweep["is_selected"]]
     assert len(selected_random_forest) == 1
     assert (
         selected_random_forest.iloc[0]["threshold"]
@@ -397,9 +387,10 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         == 0.33
     )
     assert (
-        (sweep[["precision", "recall", "f1"]] >= 0)
-        & (sweep[["precision", "recall", "f1"]] <= 1)
-    ).all().all()
+        ((sweep[["precision", "recall", "f1"]] >= 0) & (sweep[["precision", "recall", "f1"]] <= 1))
+        .all()
+        .all()
+    )
     assert {
         "logistic_prediction_selected",
         "tuned_rf_prediction_selected",
@@ -425,9 +416,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         "source": "training_feature_batch",
     }
     assert (output_dir / "final" / "classification_predictions.csv").is_file()
-    comparison = pd.read_csv(
-        output_dir / "final" / "classification_metrics_comparison.csv"
-    )
+    comparison = pd.read_csv(output_dir / "final" / "classification_metrics_comparison.csv")
     assert comparison.to_dict(orient="records") == [
         {
             "Model": "Rule Baseline",
@@ -437,9 +426,7 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         },
         {
             "Model": "Logistic Regression",
-            "Accuracy": pytest.approx(
-                result["metrics"]["Logistic Regression"]["accuracy"]
-            ),
+            "Accuracy": pytest.approx(result["metrics"]["Logistic Regression"]["accuracy"]),
             "F1-Score": pytest.approx(result["metrics"]["Logistic Regression"]["f1"]),
             "AUC": pytest.approx(result["metrics"]["Logistic Regression"]["roc_auc"]),
         },
@@ -457,15 +444,9 @@ def test_classification_compares_models_and_saves_artifacts(finance_df, tmp_path
         },
         {
             "Model": "Tuned Random Forest",
-            "Accuracy": pytest.approx(
-                result["metrics"]["Random Forest (Tuned)"]["accuracy"]
-            ),
-            "F1-Score": pytest.approx(
-                result["metrics"]["Random Forest (Tuned)"]["f1"]
-            ),
-            "AUC": pytest.approx(
-                result["metrics"]["Random Forest (Tuned)"]["roc_auc"]
-            ),
+            "Accuracy": pytest.approx(result["metrics"]["Random Forest (Tuned)"]["accuracy"]),
+            "F1-Score": pytest.approx(result["metrics"]["Random Forest (Tuned)"]["f1"]),
+            "AUC": pytest.approx(result["metrics"]["Random Forest (Tuned)"]["roc_auc"]),
         },
     ]
     for name in ["confusion_matrix.png", "roc_curve.png"]:
@@ -529,9 +510,7 @@ def test_regression_selects_alpha_and_saves_bounded_predictions(
     for predictions in result["predictions"].values():
         assert predictions.between(0, 1000).all()
     assert (output_dir / "final" / "credit_score_predictions.csv").is_file()
-    assert (
-        output_dir / "experiment" / "regularization_coefficients.png"
-    ).stat().st_size > 0
+    assert (output_dir / "experiment" / "regularization_coefficients.png").stat().st_size > 0
     assert not (output_dir / "credit_score_predictions.csv").exists()
 
 
@@ -550,9 +529,7 @@ def test_run_analysis_uses_two_stage_artifacts_and_preserves_legacy_result(
     experiment_report = json.loads(
         (output_dir / "experiment" / "experiment.json").read_text(encoding="utf-8")
     )
-    final_report = json.loads(
-        (output_dir / "final" / "metrics.json").read_text(encoding="utf-8")
-    )
+    final_report = json.loads((output_dir / "final" / "metrics.json").read_text(encoding="utf-8"))
     assert experiment_report["profile"] == "smoke"
     assert set(final_report) == {
         "dataset",
@@ -591,9 +568,7 @@ def test_run_analysis_uses_two_stage_artifacts_and_preserves_legacy_result(
         "0.01",
         "0.1",
     }
-    assert set(
-        classification["random_forest_grid_analysis"]
-    ) == {
+    assert set(classification["random_forest_grid_analysis"]) == {
         f"max_depth={max_depth}, min_samples_split={min_samples_split}"
         for max_depth in [None, 8, 16]
         for min_samples_split in [20, 40]
@@ -646,8 +621,9 @@ def test_project_selection_policy_resolves_approved_values_from_experiment():
     }
 
 
+@pytest.mark.smoke
 def test_cli_selection_ownership():
-    from train import build_parser
+    from credit_risk.cli import build_parser
 
     parser = build_parser()
 
@@ -656,8 +632,7 @@ def test_cli_selection_ownership():
     assert parser.parse_args(["all"]).command == "all"
     assert parser.parse_args(["--profile", "smoke", "all"]).profile == "smoke"
     assert (
-        parser.parse_args(["final", "--selection", "selection.json"]).selection
-        == "selection.json"
+        parser.parse_args(["final", "--selection", "selection.json"]).selection == "selection.json"
     )
 
     with pytest.raises(SystemExit):
@@ -706,7 +681,7 @@ def test_import_uses_writable_matplotlib_cache(tmp_path):
     environment.pop("MPLCONFIGDIR", None)
 
     completed = subprocess.run(
-        [sys.executable, "-c", "import train"],
+        [sys.executable, "-c", "import credit_risk.cli"],
         capture_output=True,
         text=True,
         env=environment,

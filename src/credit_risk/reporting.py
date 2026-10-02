@@ -1,8 +1,8 @@
 """Plots and serialized artifacts for completed model experiments."""
 
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 os.environ.setdefault(
     "MPLCONFIGDIR",
@@ -22,8 +22,8 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # noqa: E402
 
 from credit_risk.constants import (
-    DEFAULT_CLASSIFICATION_THRESHOLD,
     DECISION_TREE_MODEL,
+    DEFAULT_CLASSIFICATION_THRESHOLD,
     LOGISTIC_REGRESSION_MODEL,
     RANDOM_FOREST_MODEL,
     REGRESSION_ALPHAS,
@@ -31,7 +31,6 @@ from credit_risk.constants import (
     RULE_BASELINE_MODEL,
     TUNED_RANDOM_FOREST_MODEL,
 )
-
 
 _PLOT_DPI = 150
 
@@ -43,8 +42,7 @@ def _classification_confusion_predictions(
     table = result["predictions"]
     return {
         (
-            f"{LOGISTIC_REGRESSION_MODEL} "
-            f"(selected {result['selected_logistic_threshold']:.2f})"
+            f"{LOGISTIC_REGRESSION_MODEL} (selected {result['selected_logistic_threshold']:.2f})"
         ): table["logistic_prediction_selected"].to_numpy(),
         (
             f"{RANDOM_FOREST_MODEL} (Tuned, selected "
@@ -97,9 +95,7 @@ def _save_threshold_sweep(
         label=f"Baseline {DEFAULT_CLASSIFICATION_THRESHOLD:.2f}",
     )
     if sweep["is_selected"].any():
-        selected_threshold = sweep.loc[
-            sweep["is_selected"], "threshold"
-        ].iloc[0]
+        selected_threshold = sweep.loc[sweep["is_selected"], "threshold"].iloc[0]
         axis.axvline(
             selected_threshold,
             color="tab:orange",
@@ -192,8 +188,7 @@ def _save_coefficient_paths(
         feature_names = coefficients[model_name][first_alpha].keys()
         for feature_name in feature_names:
             values = [
-                coefficients[model_name][str(alpha)][feature_name]
-                for alpha in REGRESSION_ALPHAS
+                coefficients[model_name][str(alpha)][feature_name] for alpha in REGRESSION_ALPHAS
             ]
             axis.plot(REGRESSION_ALPHAS, values, marker="o", label=feature_name)
         axis.axhline(0, color="black", linewidth=0.7)
@@ -340,13 +335,19 @@ def save_experiment_artifacts(result: dict, output_dir: str | Path) -> None:
     classification = result["classification"]
     for key, filename, model_name in [
         ("logistic_threshold_sweep", "logistic_threshold_sweep.png", LOGISTIC_REGRESSION_MODEL),
-        ("random_forest_threshold_sweep", "random_forest_threshold_sweep.png", "Tuned Random Forest"),
+        (
+            "random_forest_threshold_sweep",
+            "random_forest_threshold_sweep.png",
+            "Tuned Random Forest",
+        ),
     ]:
         sweep = classification[key].copy()
         sweep["is_baseline"] = sweep["threshold"] == DEFAULT_CLASSIFICATION_THRESHOLD
         sweep["is_selected"] = False
         _save_threshold_sweep(sweep, destination / filename, model_name)
-    _save_feature_importance(classification["feature_importance"], destination / "feature_importance.png")
+    _save_feature_importance(
+        classification["feature_importance"], destination / "feature_importance.png"
+    )
     _save_random_forest_saturation_curve(
         classification["random_forest_saturation"],
         classification["best_params"]["model__n_estimators"],
@@ -377,9 +378,7 @@ def save_final_artifacts(result: dict, output_dir: str | Path) -> None:
             RULE_BASELINE_MODEL: table["rule_prediction"].to_numpy(dtype=float),
             LOGISTIC_REGRESSION_MODEL: table["logistic_probability"].to_numpy(),
             DECISION_TREE_MODEL: table["decision_tree_probability"].to_numpy(),
-            RANDOM_FOREST_MODEL: table[
-                "baseline_random_forest_probability"
-            ].to_numpy(),
+            RANDOM_FOREST_MODEL: table["baseline_random_forest_probability"].to_numpy(),
             TUNED_RANDOM_FOREST_MODEL: table["random_forest_probability"].to_numpy(),
         },
         destination / "roc_curve.png",

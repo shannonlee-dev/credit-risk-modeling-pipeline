@@ -1,7 +1,7 @@
 [project]
 name = "credit-risk-modeling-pipeline"
 version = "0.1.0"
-description = "Reproducible credit risk classification and regression pipeline"
+description = "신용 위험 분류·회귀 실험과 검증 기반 모델 선택을 재현하는 머신러닝 파이프라인"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -17,11 +17,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["credit_risk"]
+packages = ["src/credit_risk"]
 
 [dependency-groups]
 dev = [
     "pytest==8.3.3",
+    "ruff>=0.11,<1",
 ]
 
 [tool.uv]
@@ -29,3 +30,19 @@ constraint-dependencies = [
     "pyparsing==3.1.4",
     "scipy==1.14.1",
 ]
+
+[project.scripts]
+credit-risk = "credit_risk.cli:main"
+credit-risk-generate-data = "credit_risk.generate_data:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib --strict-markers"
+markers = ["smoke: 외부 서비스·원본 데이터 변경 없이 주요 실행 경로 검증"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

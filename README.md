@@ -1,8 +1,40 @@
 # 신용 위험 모델링 파이프라인
 
-[![Tests](https://github.com/shannonlee-dev/credit-risk-modeling-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/shannonlee-dev/credit-risk-modeling-pipeline/actions/workflows/tests.yml)
+## 프로젝트 소개
 
 10,000건의 재현 가능한 가상 금융 데이터를 사용해, 규칙 기반 분류와 로지스틱 회귀·단일 의사결정트리·랜덤 포레스트, 그리고 리지·라쏘 회귀를 비교하는 지도학습 포트폴리오 프로젝트입니다.
+
+## 핵심 특징
+
+- 동일한 10,000건 가상 데이터에서 분류·회귀 모델을 비교하고 난수 시드 42를 고정합니다.
+- Train-only CV/OOF 실험과 명시적 선택 파일을 사용하는 Holdout 최종 평가를 분리합니다.
+- 데이터·프로토콜 fingerprint와 기존 실험 기록으로 모델 선택 근거를 추적합니다.
+
+## 아키텍처
+
+| 구성 요소 | 역할 |
+| --- | --- |
+| `credit_risk.generate_data`, `data.py` | 고정 시드 데이터 생성, 스키마 검증, 학습·Holdout 분할 |
+| `preprocessing.py`, `experiments/` | Pipeline 전처리와 Train-only CV·OOF 실험 |
+| `selection.py`, `results.py` | 프로젝트 선택 정책과 사용자 선택 파일 검증 |
+| `classification.py`, `regression.py`, `evaluation.py` | 선택된 설정으로 최종 학습·Holdout 평가 |
+| `workflow.py`, `reporting.py`, `cli.py` | 단계 실행 조립, JSON·CSV·그래프 저장, 설치형 CLI |
+
+```mermaid
+flowchart LR
+    Generate[고정 시드 데이터 생성] --> Data[CSV 검증·80:20 분할]
+    Data --> Train[학습 데이터]
+    Train --> Prep[Pipeline 전처리]
+    Prep --> Experiment[Train CV·OOF 실험]
+    Experiment --> Evidence[experiment 산출물·selection template]
+    Evidence --> Selection[선택 파일 검토·검증]
+    Selection --> Final[선택 설정 최종 학습]
+    Train --> Final
+    Data --> Holdout[Holdout]
+    Holdout --> Evaluation[최종 평가]
+    Final --> Evaluation
+    Evaluation --> Artifacts[final 지표·예측·그래프]
+```
 
 ## 범위
 
@@ -10,31 +42,34 @@
 
 ## 빠른 시작
 
-Python 3.10 이상이 필요합니다.
+검증 환경은 Python 3.12이며 `.python-version`과 `uv.lock`을 사용합니다.
 
 ```bash
-uv sync
-uv run python scripts/generate_data.py
-uv run python train.py experiment
+make setup
+uv run --frozen credit-risk-generate-data
+uv run --frozen credit-risk experiment
 # artifacts/experiment/selection.template.json을 검토·복사해 selection.json을 작성
-uv run python train.py final --selection artifacts/experiment/selection.json
-uv run python -m pytest -v
+uv run --frozen credit-risk final --selection artifacts/experiment/selection.json
+make test
+make smoke
+make check
+make build
 ```
 
-`pip` 환경에서는 `pip install -r requirements.txt` 후 같은 명령을 `python`으로 실행할 수 있습니다. 데이터 생성 진입점은 `scripts/generate_data.py` 하나이며, `data/generated/finance_data.csv`와 예측 CSV는 생성 파일이라 Git에서 제외됩니다.
+설치형 CLI는 현재 작업 디렉터리의 `data/generated/finance_data.csv`와 `artifacts/`를 기본 경로로 사용합니다. 다른 디렉터리에서 실행할 때 `--data`와 `--output-dir`을 지정할 수 있습니다. 생성 데이터와 예측 CSV는 Git에서 제외됩니다.
 
-권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 명시적으로 제공한 selection과 dataset/protocol fingerprint가 일치하는지 확인한 뒤 Holdout을 한 번만 평가합니다. `final`의 selection source는 `selection.json` 하나입니다. `python train.py`, `python train.py all`, `run_analysis()`는 이번 experiment 결과의 technical hyperparameter와 `credit_risk.selection.PROJECT_SELECTION_POLICY`를 합쳐 repository-approved policy를 재현하는 편의 경로입니다. `all`은 user-provided selection file을 받지 않습니다. `--profile smoke`와 legacy `fast=True`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
+권장 workflow는 `experiment → human review → final`입니다. `experiment`는 Train-only CV/OOF/sensitivity evidence와 selection template만 만들고, `final`은 명시적으로 제공한 selection과 dataset/protocol fingerprint가 일치하는지 확인한 뒤 Holdout을 한 번만 평가합니다. `final`의 selection source는 `selection.json` 하나입니다. `credit-risk`, `credit-risk all`, `run_analysis()`는 이번 experiment 결과의 technical hyperparameter와 `credit_risk.selection.PROJECT_SELECTION_POLICY`를 합쳐 repository-approved policy를 재현하는 편의 경로입니다. `all`은 user-provided selection file을 받지 않습니다. `--profile smoke`와 legacy `fast=True`는 5-fold 방식은 유지하면서 Logistic C, RF `min_samples_split`, 트리 수 후보만 줄입니다.
 
 CLI contract:
 
 ```bash
 # Human-in-the-loop final evaluation
-python train.py experiment
-python train.py final --selection artifacts/experiment/selection.json
+credit-risk experiment
+credit-risk final --selection artifacts/experiment/selection.json
 
 # Repository-approved policy reproduction
-python train.py
-python train.py all
+credit-risk
+credit-risk all
 ```
 
 ## 평가 대상
@@ -99,10 +134,10 @@ Tuned Random Forest는 `n_estimators=100`을 선택했습니다. 200개로 늘�
 ## 프로젝트 구조
 
 ```text
-scripts/generate_data.py       # 재현 가능한 가상 데이터 생성
+src/credit_risk/generate_data.py # 재현 가능한 가상 데이터 생성
 data/generated/                # 생성된 가상 금융 데이터
-train.py                       # 명령줄 실행 진입점
-credit_risk/
+src/credit_risk/cli.py          # 설치형 명령줄 실행 진입점
+src/credit_risk/
   data.py                      # 스키마, 검증, 데이터 분할
   preprocessing.py             # 공통 누수 방지 전처리
   classification.py            # classifier 구성, baseline, final evaluation
@@ -137,8 +172,8 @@ Random Forest는 여러 트리의 예측을 결합해 단일 트리의 분산을
 
 ## 코드 근거 바로가기
 
-[1](./credit_risk/workflow.py) — 64번 줄
+[1](./src/credit_risk/workflow.py) — 64번 줄
 
-[2](./credit_risk/classification.py) — 332번 줄
+[2](./src/credit_risk/classification.py) — 332번 줄
 
-[3](./credit_risk/preprocessing.py) — 11번 줄
+[3](./src/credit_risk/preprocessing.py) — 11번 줄

@@ -10,8 +10,8 @@ from credit_risk.constants import (
     CREDIT_SCORE_MIN,
     RANDOM_STATE,
 )
-from credit_risk.preprocessing import build_preprocessor
 from credit_risk.evaluation import evaluate_regression
+from credit_risk.preprocessing import build_preprocessor
 from credit_risk.results import FinalSelection
 
 

@@ -13,7 +13,6 @@ from credit_risk.constants import (
     REGRESSION_TARGET,
 )
 
-
 _TEST_SIZE = 0.2
 
 
@@ -23,7 +22,7 @@ def load_and_validate_data(path: str | Path) -> pd.DataFrame:
     if not data_path.is_file():
         raise FileNotFoundError(
             f"데이터 파일을 찾을 수 없습니다: {data_path}. "
-            "먼저 `python3 scripts/generate_data.py`를 실행하세요."
+            "먼저 `credit-risk-generate-data`를 실행하세요."
         )
 
     df = pd.read_csv(data_path)

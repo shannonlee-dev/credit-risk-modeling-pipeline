@@ -8,6 +8,7 @@ import pandas as pd
 
 from credit_risk.classification import (
     adapt_legacy_classification_result,
+    evaluate_final_classification,
     train_classification,
 )
 from credit_risk.constants import (
@@ -25,20 +26,20 @@ from credit_risk.data import (
 from credit_risk.experiments.classification import run_classification_experiment
 from credit_risk.experiments.config import FULL_EXPERIMENT, SMOKE_EXPERIMENT, ExperimentProfile
 from credit_risk.experiments.regression import run_regression_experiment
-from credit_risk.classification import evaluate_final_classification
 from credit_risk.regression import (
     adapt_legacy_regression_result,
     evaluate_final_regression,
+    train_regression,
+)
+from credit_risk.reporting import (
+    save_classification_artifacts,
+    save_experiment_artifacts,
+    save_final_artifacts,
+    save_regression_artifacts,
 )
 from credit_risk.results import FinalSelection
 from credit_risk.selection import PROJECT_SELECTION_POLICY
-from credit_risk.regression import train_regression
-from credit_risk.reporting import (
-    save_experiment_artifacts,
-    save_final_artifacts,
-    save_classification_artifacts,
-    save_regression_artifacts,
-)
+
 
 def _protocol_fingerprint(profile: ExperimentProfile) -> str:
     payload = json.dumps(
@@ -66,7 +67,10 @@ def _selection_template(experiment: dict) -> dict:
         "protocol_fingerprint": experiment["protocol_fingerprint"],
         "classification": {
             "selected_model": None,
-            "logistic_regression": {"C": experiment["classification"]["selected_logistic_c"], "threshold": None},
+            "logistic_regression": {
+                "C": experiment["classification"]["selected_logistic_c"],
+                "threshold": None,
+            },
             "random_forest": {
                 "n_estimators": None,
                 "max_depth": best["model__max_depth"],
@@ -84,18 +88,16 @@ def _selection_template(experiment: dict) -> dict:
 def resolve_default_selection(experiment: dict) -> dict:
     """Resolve the repository-approved reproducibility selection."""
     selection = _selection_template(experiment)
-    selection["classification"]["selected_model"] = PROJECT_SELECTION_POLICY[
-        "selected_model"
+    selection["classification"]["selected_model"] = PROJECT_SELECTION_POLICY["selected_model"]
+    selection["classification"]["logistic_regression"]["threshold"] = PROJECT_SELECTION_POLICY[
+        "logistic_threshold"
     ]
-    selection["classification"]["logistic_regression"]["threshold"] = (
-        PROJECT_SELECTION_POLICY["logistic_threshold"]
-    )
-    selection["classification"]["random_forest"]["n_estimators"] = (
-        PROJECT_SELECTION_POLICY["random_forest_n_estimators"]
-    )
-    selection["classification"]["random_forest"]["threshold"] = (
-        PROJECT_SELECTION_POLICY["random_forest_threshold"]
-    )
+    selection["classification"]["random_forest"]["n_estimators"] = PROJECT_SELECTION_POLICY[
+        "random_forest_n_estimators"
+    ]
+    selection["classification"]["random_forest"]["threshold"] = PROJECT_SELECTION_POLICY[
+        "random_forest_threshold"
+    ]
     return selection
 
 
@@ -140,10 +142,18 @@ def run_experiment(
     }
     destination = Path(output_dir) / "experiment"
     destination.mkdir(parents=True, exist_ok=True)
-    (destination / "experiment.json").write_text(json.dumps(_json_ready(result), ensure_ascii=False, indent=2), encoding="utf-8")
-    (destination / "selection.template.json").write_text(json.dumps(_selection_template(result), ensure_ascii=False, indent=2), encoding="utf-8")
-    result["classification"]["logistic_threshold_sweep"].to_csv(destination / "logistic_threshold_sweep.csv", index=False)
-    result["classification"]["random_forest_threshold_sweep"].to_csv(destination / "random_forest_threshold_sweep.csv", index=False)
+    (destination / "experiment.json").write_text(
+        json.dumps(_json_ready(result), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (destination / "selection.template.json").write_text(
+        json.dumps(_selection_template(result), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    result["classification"]["logistic_threshold_sweep"].to_csv(
+        destination / "logistic_threshold_sweep.csv", index=False
+    )
+    result["classification"]["random_forest_threshold_sweep"].to_csv(
+        destination / "random_forest_threshold_sweep.csv", index=False
+    )
     save_experiment_artifacts(result, destination)
     return result
 
@@ -176,23 +186,36 @@ def _run_final_evaluation(
     destination.mkdir(parents=True, exist_ok=True)
     classification_metrics = {
         key: value
-        for key, value in result["classification"]["metrics"][
-            selection.selected_model
-        ].items()
+        for key, value in result["classification"]["metrics"][selection.selected_model].items()
         if key != "batch_prediction_latency_ms"
     }
     metrics = {
         "dataset": result["dataset"],
-        "selection": {"classification_model": selection.selected_model, "threshold": result["classification"]["selected_threshold"]},
+        "selection": {
+            "classification_model": selection.selected_model,
+            "threshold": result["classification"]["selected_threshold"],
+        },
         "classification": classification_metrics,
         "regression": {
             name: {"alpha": result["regression"]["selected_alpha"][name], **values}
             for name, values in result["regression"]["test_metrics"].items()
         },
     }
-    (destination / "metrics.json").write_text(json.dumps(_json_ready(metrics), ensure_ascii=False, indent=2), encoding="utf-8")
-    result["classification"]["predictions"].to_csv(destination / "classification_predictions.csv", index=False)
-    pd.DataFrame({"actual_credit_score": regression_split[3].to_numpy(), **{name: values.to_numpy() for name, values in result["regression"]["predictions"].items()}}).to_csv(destination / "credit_score_predictions.csv", index=False)
+    (destination / "metrics.json").write_text(
+        json.dumps(_json_ready(metrics), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    result["classification"]["predictions"].to_csv(
+        destination / "classification_predictions.csv", index=False
+    )
+    pd.DataFrame(
+        {
+            "actual_credit_score": regression_split[3].to_numpy(),
+            **{
+                name: values.to_numpy()
+                for name, values in result["regression"]["predictions"].items()
+            },
+        }
+    ).to_csv(destination / "credit_score_predictions.csv", index=False)
     save_final_artifacts(result, destination)
     return result
 
@@ -232,6 +255,7 @@ def run_all(
     """Reproduce the approved default selection through the two-stage path."""
     _, final = _run_all_stages(data_path, output_dir, profile)
     return final
+
 
 def run_classification(
     x_train: pd.DataFrame,
@@ -280,9 +304,7 @@ def run_analysis(
     return {
         "data_distribution": {
             **experiment["data_distribution"],
-            "test": class_distribution(
-                final["classification"]["predictions"]["actual_is_overdue"]
-            ),
+            "test": class_distribution(final["classification"]["predictions"]["actual_is_overdue"]),
         },
         "classification": adapt_legacy_classification_result(
             experiment["classification"],

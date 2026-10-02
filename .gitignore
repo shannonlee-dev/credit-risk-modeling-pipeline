@@ -5,3 +5,8 @@ artifacts/final/credit_score_predictions.csv
 .venv/
 __pycache__/
 .pytest_cache/
+
+.ruff_cache/
+dist/
+build/
+*.egg-info/

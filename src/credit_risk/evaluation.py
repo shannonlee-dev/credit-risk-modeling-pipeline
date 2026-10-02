@@ -6,9 +6,9 @@ from sklearn.metrics import (
     accuracy_score,
     f1_score,
     mean_absolute_error,
+    precision_score,
     r2_score,
     recall_score,
-    precision_score,
     roc_auc_score,
     root_mean_squared_error,
 )
@@ -37,9 +37,7 @@ def evaluate_thresholds(
                 "tp": int(np.sum((actual == 1) & (predictions == 1))),
                 "fp": int(np.sum((actual == 0) & (predictions == 1))),
                 "fn": int(np.sum((actual == 1) & (predictions == 0))),
-                "precision": float(
-                    precision_score(actual, predictions, zero_division=0)
-                ),
+                "precision": float(precision_score(actual, predictions, zero_division=0)),
                 "recall": float(recall_score(actual, predictions, zero_division=0)),
                 "f1": float(f1_score(actual, predictions, zero_division=0)),
             }

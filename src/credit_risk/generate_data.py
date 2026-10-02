@@ -1,6 +1,5 @@
 """Generate the synthetic finance dataset used by the project."""
 
-import random  # Included to match the supplied generation environment.
 from pathlib import Path
 
 import numpy as np
@@ -35,17 +34,20 @@ def generate_finance_data(
     df["annual_income"] = df["annual_income"].apply(lambda value: max(value, 1_500))
 
     df[REGRESSION_TARGET] = (
-        300
-        + (df["annual_income"] / 100) * 3
-        - (df["overdue_count_6m"] * 50)
-        - (df["debt_ratio"] * 100)
-        + np.random.normal(0, 30, sample_count)
-    ).clip(CREDIT_SCORE_MIN, CREDIT_SCORE_MAX).round(0)
+        (
+            300
+            + (df["annual_income"] / 100) * 3
+            - (df["overdue_count_6m"] * 50)
+            - (df["debt_ratio"] * 100)
+            + np.random.normal(0, 30, sample_count)
+        )
+        .clip(CREDIT_SCORE_MIN, CREDIT_SCORE_MAX)
+        .round(0)
+    )
 
     threshold = df[REGRESSION_TARGET].quantile(0.15)
     df[CLASSIFICATION_TARGET] = np.where(
-        (df[REGRESSION_TARGET] < threshold)
-        & (np.random.rand(sample_count) > 0.2),
+        (df[REGRESSION_TARGET] < threshold) & (np.random.rand(sample_count) > 0.2),
         1,
         0,
     )

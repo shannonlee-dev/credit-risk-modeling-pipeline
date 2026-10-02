@@ -3,7 +3,6 @@
 from dataclasses import replace
 from time import perf_counter
 
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -11,8 +10,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeClassifier
 
 from credit_risk.constants import (
-    DEFAULT_CLASSIFICATION_THRESHOLD,
     DECISION_TREE_MODEL,
+    DEFAULT_CLASSIFICATION_THRESHOLD,
     LOGISTIC_REGRESSION_MODEL,
     RANDOM_FOREST_MODEL,
     RANDOM_STATE,
@@ -119,10 +118,7 @@ def _feature_importance(model: Pipeline) -> dict[str, float]:
         .sort_values("importance", ascending=False)
         .reset_index(drop=True)
     )
-    return {
-        row.feature: float(row.importance)
-        for row in importance.itertuples(index=False)
-    }
+    return {row.feature: float(row.importance) for row in importance.itertuples(index=False)}
 
 
 def evaluate_final_classification(
@@ -171,18 +167,10 @@ def evaluate_final_classification(
         RULE_BASELINE_MODEL: _average_latency_ms(
             lambda: batch.apply(rule_based_predict, axis=1).to_numpy()
         ),
-        LOGISTIC_REGRESSION_MODEL: _average_latency_ms(
-            lambda: logistic.predict_proba(batch)
-        ),
-        DECISION_TREE_MODEL: _average_latency_ms(
-            lambda: decision_tree.predict_proba(batch)
-        ),
-        RANDOM_FOREST_MODEL: _average_latency_ms(
-            lambda: baseline_forest.predict_proba(batch)
-        ),
-        TUNED_RANDOM_FOREST_MODEL: _average_latency_ms(
-            lambda: tuned_forest.predict_proba(batch)
-        ),
+        LOGISTIC_REGRESSION_MODEL: _average_latency_ms(lambda: logistic.predict_proba(batch)),
+        DECISION_TREE_MODEL: _average_latency_ms(lambda: decision_tree.predict_proba(batch)),
+        RANDOM_FOREST_MODEL: _average_latency_ms(lambda: baseline_forest.predict_proba(batch)),
+        TUNED_RANDOM_FOREST_MODEL: _average_latency_ms(lambda: tuned_forest.predict_proba(batch)),
     }
     predictions = {
         RULE_BASELINE_MODEL: rule_predictions,
@@ -279,9 +267,7 @@ def adapt_legacy_classification_result(
         selection.random_forest_threshold,
     )
     table = final["predictions"]
-    selected_logistic = experiment["logistic_c_analysis"][
-        str(experiment["selected_logistic_c"])
-    ]
+    selected_logistic = experiment["logistic_c_analysis"][str(experiment["selected_logistic_c"])]
     return {
         "metrics": final["metrics"],
         "logistic_cv": {
@@ -306,9 +292,7 @@ def adapt_legacy_classification_result(
         "best_params": experiment["best_params"],
         "best_cv_roc_auc": experiment["best_cv_roc_auc"],
         "best_cv_f1": experiment["best_cv_f1"],
-        "random_forest_grid_analysis": experiment[
-            "random_forest_grid_analysis"
-        ],
+        "random_forest_grid_analysis": experiment["random_forest_grid_analysis"],
         "random_forest_saturation": experiment["random_forest_saturation"],
         "feature_importance": experiment["feature_importance"],
         "logistic_threshold_sweep": logistic_sweep,
@@ -322,13 +306,9 @@ def adapt_legacy_classification_result(
                 "logistic_prediction_selected": table["logistic_prediction"],
                 "decision_tree_probability": table["decision_tree_probability"],
                 "decision_tree_prediction": table["decision_tree_prediction"],
-                "random_forest_probability": table[
-                    "baseline_random_forest_probability"
-                ],
+                "random_forest_probability": table["baseline_random_forest_probability"],
                 "overdue_probability": table["random_forest_probability"],
-                "tuned_rf_prediction_selected": table[
-                    "random_forest_prediction"
-                ],
+                "tuned_rf_prediction_selected": table["random_forest_prediction"],
             }
         ),
     }
@@ -355,9 +335,7 @@ def train_classification(
             config,
             rf_grid_n_estimators_values=tuple(grid["model__n_estimators"]),
             rf_max_depth_values=tuple(grid["model__max_depth"]),
-            rf_min_samples_split_values=tuple(
-                grid["model__min_samples_split"]
-            ),
+            rf_min_samples_split_values=tuple(grid["model__min_samples_split"]),
         )
     experiment = run_classification_experiment(x_train, y_train, config)
     best = experiment["best_params"]

@@ -20,7 +20,9 @@ def run_regression_experiment(
     for name in REGRESSION_MODELS:
         for alpha in config.alphas:
             pipeline = _regularized_pipeline(name, alpha)
-            scores = cross_val_score(pipeline, x_train, y_train, scoring="neg_root_mean_squared_error", cv=cv, n_jobs=-1)
+            scores = cross_val_score(
+                pipeline, x_train, y_train, scoring="neg_root_mean_squared_error", cv=cv, n_jobs=-1
+            )
             cv_rmse[name][str(alpha)] = float(-scores.mean())
             pipeline.fit(x_train, y_train)
             features = pipeline.named_steps["preprocessor"].get_feature_names_out()
@@ -30,6 +32,8 @@ def run_regression_experiment(
             }
     return {
         "cv_rmse": cv_rmse,
-        "selected_alpha": {name: float(min(cv_rmse[name], key=cv_rmse[name].get)) for name in REGRESSION_MODELS},
+        "selected_alpha": {
+            name: float(min(cv_rmse[name], key=cv_rmse[name].get)) for name in REGRESSION_MODELS
+        },
         "coefficients": coefficients,
     }

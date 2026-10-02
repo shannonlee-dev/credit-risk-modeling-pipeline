@@ -30,9 +30,7 @@ def _add_execution_arguments(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="신용 위험 분류·회귀 모델을 학습하고 평가합니다."
-    )
+    parser = argparse.ArgumentParser(description="신용 위험 분류·회귀 모델을 학습하고 평가합니다.")
     _add_execution_arguments(parser)
     parser.set_defaults(command="all")
     commands = parser.add_subparsers(dest="command")
@@ -57,13 +55,13 @@ def main() -> None:
     try:
         profile = FULL_EXPERIMENT if args.profile == "full" else SMOKE_EXPERIMENT
         if args.command == "experiment":
-            result = run_experiment(args.data, args.output_dir, profile)
+            run_experiment(args.data, args.output_dir, profile)
             print(f"실험 완료: {Path(args.output_dir, 'experiment').resolve()}")
             return
         if args.command == "final":
-            result = run_final_evaluation(args.data, args.selection, args.output_dir, profile)
+            run_final_evaluation(args.data, args.selection, args.output_dir, profile)
         else:
-            result = run_all(args.data, args.output_dir, profile)
+            run_all(args.data, args.output_dir, profile)
     except (FileNotFoundError, ValueError) as error:
         parser.error(str(error))
 

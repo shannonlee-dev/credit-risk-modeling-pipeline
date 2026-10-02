@@ -31,8 +31,7 @@ class FinalSelection:
         if self.selected_model == LOGISTIC_REGRESSION_MODEL and self.logistic_threshold is None:
             raise ValueError("selected Logistic Regression requires logistic threshold")
         if self.selected_model == TUNED_RANDOM_FOREST_MODEL and (
-            self.random_forest_threshold is None
-            or self.random_forest_n_estimators is None
+            self.random_forest_threshold is None or self.random_forest_n_estimators is None
         ):
             raise ValueError("selected Random Forest requires n_estimators and threshold")
 
